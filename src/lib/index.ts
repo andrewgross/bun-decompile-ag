@@ -86,10 +86,12 @@ export function extractBundledFiles(
   let modulesStart: number;
 
   if (section.container === "macho") {
-    // Mach-O: section.data = [modules][metadata][Offsets][trailer 16B]
+    // Mach-O: section.data = [header?][modules][metadata][Offsets][trailer 16B]
+    // Different Bun versions have 0, 4, or 8 byte headers; modulesStart is
+    // computed after parsing offsets below.
     dataView = section.data;
     trailerOffset = dataView.byteLength - BUN_TRAILER.length;
-    modulesStart = 0;
+    modulesStart = 0; // placeholder, computed after parseOffsets
   } else {
     // Appended: full binary = [...native code...][modules][metadata][Offsets 24B][trailer 16B][totalByteCount 8B]
     dataView = section.data;
@@ -107,9 +109,13 @@ export function extractBundledFiles(
   // 3. Parse the Offsets struct (variable size: 24 or 32 bytes)
   const offsets = parseOffsets(dataView, trailerOffset);
 
-  // For appended format, compute modulesStart from offsetByteCount
-  if (section.container === "append") {
-    // offsetByteCount + structSize + trailer + totalByteCount = distance from modulesStart to EOF
+  // Compute modulesStart from offsetByteCount
+  if (section.container === "macho") {
+    // [header?][modules+metadata = offsetByteCount][Offsets][trailer 16B]
+    modulesStart =
+      dataView.byteLength - (offsets.offsetByteCount + offsets.structSize + BUN_TRAILER.length);
+  } else {
+    // [native code][modules+metadata = offsetByteCount][Offsets][trailer 16B][totalByteCount 8B]
     modulesStart =
       dataView.byteLength - (offsets.offsetByteCount + offsets.structSize + BUN_TRAILER.length + 8);
   }
@@ -136,7 +142,7 @@ export function extractBundledFiles(
   } else if (section.container === "macho") {
     // V3: Mach-O with 24-byte offsets, always new format
     newFormat = true;
-    modulesMetadataChunkSize = 28;
+    modulesMetadataChunkSize = 36;
   } else {
     // V1/V2 appended format: use the existing heuristic
     const structStart = trailerOffset - offsets.structSize;

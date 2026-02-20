@@ -1,6 +1,6 @@
 /// <reference path="../imports.d.ts" />
 
-import favicon from "../../../../static/favicon.png";
+import favicon from "./favicon.png";
 import rawPasswordOne from "./password1.txt";
 import rawPasswordTwo from "./password2.bin";
 

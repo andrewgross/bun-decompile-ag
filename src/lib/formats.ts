@@ -1,4 +1,4 @@
-import { BUN_SECTION_DATA_HEADER_SIZE, BUN_TRAILER } from "./constants";
+import { BUN_TRAILER } from "./constants";
 import { findBunSection } from "./macho";
 
 export interface DataSection {
@@ -22,10 +22,14 @@ export function locateDataSection(binary: DataView): DataSection | null {
   // Strategy 1: Mach-O __BUN/__bun section
   const machoSection = findBunSection(binary);
   if (machoSection) {
+    // Use the full Mach-O section — different Bun versions have different
+    // sized headers (0, 4, or 8 bytes) before the data.  The caller computes
+    // modulesStart dynamically from the Offsets struct so header size doesn't
+    // matter.
     const sectionData = new DataView(
       binary.buffer,
-      binary.byteOffset + machoSection.offset + BUN_SECTION_DATA_HEADER_SIZE,
-      machoSection.size - BUN_SECTION_DATA_HEADER_SIZE,
+      binary.byteOffset + machoSection.offset,
+      machoSection.size,
     );
 
     if (hasTrailerAt(sectionData, sectionData.byteLength - BUN_TRAILER.length)) {

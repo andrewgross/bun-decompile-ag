@@ -9,7 +9,8 @@ set -eo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 FIXTURES_DIR="$PROJECT_DIR/src/lib/tests/fixtures"
-DUMMY_SRC="$PROJECT_DIR/src/lib/tests/dummy/index.ts"
+DUMMY_DIR="$PROJECT_DIR/src/lib/tests/dummy"
+DUMMY_SRC="$DUMMY_DIR/index.ts"
 
 source "$SCRIPT_DIR/get-bun.sh"
 
@@ -22,11 +23,23 @@ for version in "${VERSIONS[@]}"; do
   echo "=== Building fixture for Bun v${version} ==="
 
   BUN_BIN=$(get_bun_path "$version")
-  outfile="/tmp/dummy-fixture-${version}"
+  outname="dummy-fixture-${version}"
+  outfile="/tmp/${outname}"
 
   # Compile the dummy binary using that Bun version
+  #   Older Bun versions may exit non-zero despite successful compilation
   "$BUN_BIN" build --compile --sourcemap=inline \
-    "$DUMMY_SRC" --outfile "$outfile"
+    "$DUMMY_SRC" --outfile "$outfile" || true
+
+  # Handle older Bun writing output next to source instead of --outfile path
+  if [ ! -f "$outfile" ] && [ -f "$DUMMY_DIR/$outname" ]; then
+    mv "$DUMMY_DIR/$outname" "$outfile"
+  fi
+
+  if [ ! -f "$outfile" ]; then
+    echo "  FAIL: compilation failed for Bun v${version}"
+    exit 1
+  fi
 
   # Extract just the data section (using current Bun)
   bun "$SCRIPT_DIR/extract-section.ts" "$outfile" -o "$FIXTURES_DIR/v${version}.bin"
