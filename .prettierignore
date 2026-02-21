@@ -1,9 +1,8 @@
-# Dummy compiled binary
+# Test executables
 /src/lib/tests/dummy/dummy
 /src/lib/tests/dummy/dummy-v*
-/src/lib/segfault.ts
 
-# Package Managers
+# Package managers
 package-lock.json
 pnpm-lock.yaml
 yarn.lock

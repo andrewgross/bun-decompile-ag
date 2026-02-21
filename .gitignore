@@ -4,27 +4,16 @@
 /src/lib/tests/selfcheck/selfcheck
 /src/lib/tests/selfcheck/selfcheck-v*
 
-# Test reports
-/static/tests.html
+# Test fixtures (generated, not committed)
+/src/lib/tests/fixtures/
 
 node_modules
 
-# Output
-.output
-.vercel
-/.svelte-kit
-/build
-
 # OS
 .DS_Store
-Thumbs.db
 
 # Env
 .env
 .env.*
 !.env.example
 !.env.test
-
-# Vite
-vite.config.js.timestamp-*
-vite.config.ts.timestamp-*
