@@ -153,12 +153,22 @@ export function extractBundledFiles(
   }
 
   // 6. Parse each module
+  // V3/V4 metadata chunks (>= 36 bytes) have an absolute startOffset at +0
+  // that points to where each module's data lives in the modules area.
+  // V1/V2 chunks (28/32 bytes) lack this, so we iterate sequentially.
+  const hasAbsoluteOffsets = modulesMetadataChunkSize >= 36;
+
   const bundledFiles: BundledFile[] = [];
   let currentOffset = 0;
   for (let i = 0; i < offsets.modulesPtrLength / modulesMetadataChunkSize; i++) {
     const isEntrypoint = i === offsets.entryPointId;
 
     const modulesMetadataOffset = modulesMetadataStart + i * modulesMetadataChunkSize;
+
+    if (hasAbsoluteOffsets) {
+      currentOffset = dataView.getUint32(modulesMetadataOffset, true);
+    }
+
     const pathLength = dataView.getUint32(modulesMetadataOffset + 4, true);
     const contentsLength = dataView.getUint32(modulesMetadataOffset + 12, true);
     const sourcemapLength = dataView.getUint32(modulesMetadataOffset + 20, true);
