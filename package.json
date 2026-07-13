@@ -5,7 +5,10 @@
   "bin": {
     "bun-decompile": "./src/cli.ts"
   },
-  "files": ["src/lib/", "src/cli.ts"],
+  "files": [
+    "src/lib/",
+    "src/cli.ts"
+  ],
   "devDependencies": {
     "@ianvs/prettier-plugin-sort-imports": "^4.6.2",
     "@types/bun": "^1.2.20",
