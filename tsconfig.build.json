@@ -1,0 +1,19 @@
+{
+  // Build config: emits Node-loadable ESM + declarations to dist/.
+  // The base config targets Bun with bundler resolution, which allows
+  // extensionless imports Node's ESM resolver would reject; nodenext enforces
+  // the explicit ".js" specifiers the emitted output needs.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "rootDir": "src",
+    "outDir": "dist",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "types": ["node"]
+  },
+  "include": ["src/lib/**/*.ts", "src/cli.ts"],
+  "exclude": ["src/lib/tests/**", "src/scripts/**"]
+}

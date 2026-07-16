@@ -1,10 +1,10 @@
-import type { SectionLocation } from "./sections";
+import type { SectionLocation } from "./sections.js";
 
-import { BUN_TRAILER, ELF_MAGIC_LE, MACHO_MAGIC_64_LE } from "./constants";
-import { findElfBunSection } from "./elf";
-import { InvalidTrailerError, TotalByteCountMismatchError } from "./errors";
-import { findMachoBunSection } from "./macho";
-import { findPeBunSection } from "./pe";
+import { BUN_TRAILER, ELF_MAGIC_LE, MACHO_MAGIC_64_LE } from "./constants.js";
+import { findElfBunSection } from "./elf.js";
+import { InvalidTrailerError, TotalByteCountMismatchError } from "./errors.js";
+import { findMachoBunSection } from "./macho.js";
+import { findPeBunSection } from "./pe.js";
 
 export type ContainerKind = "macho" | "elf" | "pe" | "append";
 export type ExecutableFormat = "macho" | "elf" | "pe" | "unknown";

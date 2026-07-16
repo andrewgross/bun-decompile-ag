@@ -1,15 +1,15 @@
-import type { BundledFile } from "./modules";
+import type { BundledFile } from "./modules.js";
 
 import {
   BUN_TRAILER,
   BUN_VERSION_MATCH,
   BUN_VERSION_MATCH_BANNER,
   BUN_VERSION_MATCH_OLD,
-} from "./constants";
-import { VersionNotFoundError } from "./errors";
-import { findBunSectionOffset, locateBunSection } from "./formats";
-import { buildModuleGraph, extractModules } from "./modules";
-import { parseOffsets } from "./offsets";
+} from "./constants.js";
+import { VersionNotFoundError } from "./errors.js";
+import { findBunSectionOffset, locateBunSection } from "./formats.js";
+import { buildModuleGraph, extractModules } from "./modules.js";
+import { parseOffsets } from "./offsets.js";
 
 // Public API re-exports.
 export {
@@ -17,12 +17,31 @@ export {
   InvalidTrailerError,
   TotalByteCountMismatchError,
   VersionNotFoundError,
-} from "./errors";
-export { removeLeadingSlash, type BundledFile } from "./modules";
-export type { ContainerKind } from "./formats";
+} from "./errors.js";
+export { removeLeadingSlash, type BundledFile } from "./modules.js";
+export type { ContainerKind } from "./formats.js";
 
 export interface ExtractBundledFilesOptions {
   normaliseEntrypointFileName?: boolean;
+}
+
+/** Any binary input the public API accepts. */
+export type BinaryInput = DataView | ArrayBuffer | Uint8Array<ArrayBufferLike>;
+
+/** A byte view over any backing buffer — notably including a Node Buffer. */
+type Bytes = Uint8Array<ArrayBufferLike>;
+
+/**
+ * Normalise binary input to a DataView windowed over exactly the caller's bytes.
+ *
+ * Views are re-wrapped using their own byteOffset/byteLength rather than the
+ * whole backing buffer: Node pools Buffer allocations, so `buf.buffer` is
+ * routinely larger than the file and reading it whole would parse adjacent junk.
+ */
+function toDataView(input: BinaryInput): DataView {
+  if (input instanceof DataView) return input;
+  if (input instanceof ArrayBuffer) return new DataView(input);
+  return new DataView(input.buffer, input.byteOffset, input.byteLength);
 }
 
 /**
@@ -41,13 +60,10 @@ export interface ExtractBundledFilesOptions {
  * Reverse-engineered from bun `src/standalone_graph/StandaloneModuleGraph.zig`.
  */
 export function extractBundledFiles(
-  compiledBinaryData: DataView | ArrayBuffer,
+  compiledBinaryData: BinaryInput,
   options: ExtractBundledFilesOptions = {},
 ): BundledFile[] {
-  const binary =
-    compiledBinaryData instanceof ArrayBuffer
-      ? new DataView(compiledBinaryData)
-      : compiledBinaryData;
+  const binary = toDataView(compiledBinaryData);
 
   const section = locateBunSection(binary);
   const offsets = parseOffsets(section.view, section.view.byteLength - BUN_TRAILER.length);
@@ -64,7 +80,7 @@ export interface BunVersion {
   newFormat?: boolean;
 }
 
-function getExecutableVersionNew(data: Uint8Array, searchLimit: number): BunVersion {
+function getExecutableVersionNew(data: Bytes, searchLimit: number): BunVersion {
   const versionIndex = data.findIndex((_, index) => {
     if (index >= searchLimit) {
       return false;
@@ -103,7 +119,7 @@ function getExecutableVersionNew(data: Uint8Array, searchLimit: number): BunVers
   return { version, revision };
 }
 
-function getExecutableVersionOld(data: Uint8Array, searchLimit: number): BunVersion {
+function getExecutableVersionOld(data: Bytes, searchLimit: number): BunVersion {
   const versionIndex = data.findIndex((_, index) => {
     if (index >= searchLimit) {
       return false;
@@ -151,7 +167,7 @@ function getExecutableVersionOld(data: Uint8Array, searchLimit: number): BunVers
  * banner is still present in the runtime's read-only data. Scan for it and pull
  * out the semantic version (and revision, if present).
  */
-function getExecutableVersionBanner(data: Uint8Array, searchLimit: number): BunVersion {
+function getExecutableVersionBanner(data: Bytes, searchLimit: number): BunVersion {
   const decoder = new TextDecoder();
   const needle = BUN_VERSION_MATCH_BANNER;
 
@@ -185,7 +201,7 @@ function getExecutableVersionBanner(data: Uint8Array, searchLimit: number): BunV
  * Find the first occurrence of an ASCII needle in `data` within [from, limit).
  * Returns the byte offset, or -1 if not found.
  */
-function indexOfBytes(data: Uint8Array, needle: string, from: number, limit: number): number {
+function indexOfBytes(data: Bytes, needle: string, from: number, limit: number): number {
   const max = Math.min(limit, data.length - needle.length + 1);
   for (let i = from; i < max; i++) {
     let matched = true;
@@ -200,10 +216,9 @@ function indexOfBytes(data: Uint8Array, needle: string, from: number, limit: num
   return -1;
 }
 
-export function getExecutableVersion(data: Uint8Array | ArrayBuffer): BunVersion {
-  const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : data;
-
-  const binary = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+export function getExecutableVersion(data: BinaryInput): BunVersion {
+  const binary = toDataView(data);
+  const bytes = new Uint8Array(binary.buffer, binary.byteOffset, binary.byteLength);
 
   // Determine search limit to exclude embedded module data (prevents matching
   // fake version strings inside bundled files). Works for any container that

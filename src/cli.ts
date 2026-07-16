@@ -1,18 +1,21 @@
-#!/usr/bin/env bun
-import { mkdir } from "node:fs/promises";
+#!/usr/bin/env node
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { dirname, join } from "node:path";
 
-import { extractBundledFiles, getExecutableVersion } from "./lib";
+import { extractBundledFiles, getExecutableVersion } from "./lib/index.js";
 
-const pkg = require("../package.json");
+// `../package.json` resolves to the package root from both src/cli.ts (dev) and
+// dist/cli.js (built), since the build mirrors src/ into dist/.
+const pkg = createRequire(import.meta.url)("../package.json");
 
 function printHelp() {
-  console.log(`bun-decompile v${pkg.version}
+  console.log(`bun-decompile-ag v${pkg.version}
 
 Extracts bundled source files from a Bun-compiled binary.
 
 Usage:
-  bun-decompile <input-binary> [options]
+  bun-decompile-ag <input-binary> [options]
 
 Options:
   -o, --output <dir>   Output directory (default: ./decompiled)
@@ -74,16 +77,31 @@ function parseArgs(args: string[]) {
   return { inputPath, outputDir, noNormalize };
 }
 
+async function readInput(inputPath: string): Promise<Buffer> {
+  try {
+    return await readFile(inputPath);
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "ENOENT") {
+      console.error(`Error: File not found: ${inputPath}`);
+      process.exit(1);
+    }
+    if (code === "EISDIR") {
+      console.error(`Error: Not a file: ${inputPath}`);
+      process.exit(1);
+    }
+    throw err;
+  }
+}
+
 async function main() {
   const { inputPath, outputDir, noNormalize } = parseArgs(process.argv.slice(2));
 
-  const file = Bun.file(inputPath);
-  if (!(await file.exists())) {
-    console.error(`Error: File not found: ${inputPath}`);
-    process.exit(1);
-  }
-
-  const data = await file.arrayBuffer();
+  const buffer = await readInput(inputPath);
+  // Node pools Buffer allocations, so the backing ArrayBuffer can be larger than
+  // the file. Window a DataView over just this buffer's region rather than
+  // handing the whole pool to the parser.
+  const data = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
 
   // Version detection is informational only — extraction relies on the binary's
   // struct layout, not the version string. Never let a failed/changed version
@@ -105,10 +123,10 @@ async function main() {
   for (const bundledFile of files) {
     const outPath = join(outputDir, bundledFile.path);
     await mkdir(dirname(outPath), { recursive: true });
-    await Bun.write(outPath, bundledFile.contents);
+    await writeFile(outPath, new Uint8Array(bundledFile.contents));
 
     if (bundledFile.sourcemap) {
-      await Bun.write(`${outPath}.map`, JSON.stringify(bundledFile.sourcemap));
+      await writeFile(`${outPath}.map`, JSON.stringify(bundledFile.sourcemap));
     }
   }
 

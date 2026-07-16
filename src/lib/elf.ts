@@ -1,7 +1,7 @@
-import type { SectionLocation } from "./sections";
+import type { SectionLocation } from "./sections.js";
 
-import { ELF_MAGIC_LE } from "./constants";
-import { readCString } from "./sections";
+import { ELF_MAGIC_LE } from "./constants.js";
+import { readCString } from "./sections.js";
 
 /**
  * Find the `.bun` section in an ELF 64-bit binary (Linux / FreeBSD).

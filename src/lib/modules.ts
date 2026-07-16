@@ -1,8 +1,8 @@
-import type { BunSection, ContainerKind } from "./formats";
-import type { ParsedOffsets } from "./offsets";
+import type { BunSection, ContainerKind } from "./formats.js";
+import type { ParsedOffsets } from "./offsets.js";
 
-import { BUN_TRAILER, BUNFS_ROOT, BUNFS_ROOT_OLD, BUNFS_ROOT_WINDOWS } from "./constants";
-import { InvalidExecutableError } from "./errors";
+import { BUN_TRAILER, BUNFS_ROOT, BUNFS_ROOT_OLD, BUNFS_ROOT_WINDOWS } from "./constants.js";
+import { InvalidExecutableError } from "./errors.js";
 
 export interface BundledFile {
   path: string;

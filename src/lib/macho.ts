@@ -1,7 +1,7 @@
-import type { SectionLocation } from "./sections";
+import type { SectionLocation } from "./sections.js";
 
-import { LC_SEGMENT_64, MACHO_MAGIC_64_LE } from "./constants";
-import { readCString } from "./sections";
+import { LC_SEGMENT_64, MACHO_MAGIC_64_LE } from "./constants.js";
+import { readCString } from "./sections.js";
 
 /**
  * Find the `__BUN/__bun` section in a Mach-O 64-bit binary (macOS).

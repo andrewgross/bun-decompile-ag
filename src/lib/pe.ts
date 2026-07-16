@@ -1,6 +1,6 @@
-import type { SectionLocation } from "./sections";
+import type { SectionLocation } from "./sections.js";
 
-import { readCString } from "./sections";
+import { readCString } from "./sections.js";
 
 /**
  * Find the `.bun` section in a PE32+ binary (Windows).
