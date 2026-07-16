@@ -80,121 +80,112 @@ export interface BunVersion {
   newFormat?: boolean;
 }
 
-function getExecutableVersionNew(data: Bytes, searchLimit: number): BunVersion {
-  const versionIndex = data.findIndex((_, index) => {
-    if (index >= searchLimit) {
-      return false;
-    }
+/** How long a window to read when nothing delimits the version text. */
+const BANNER_WINDOW = 96;
 
-    for (let i = 0; i < BUN_VERSION_MATCH.length; i++) {
-      if (data[index + i] !== BUN_VERSION_MATCH.charCodeAt(i)) {
-        return false;
-      }
-    }
+/** ASCII byte constants for the delimiters Bun happens to use. */
+const ESC = 0x1b;
+const COLON = 0x3a;
 
-    return true;
-  });
-
-  if (versionIndex === -1) {
-    throw new VersionNotFoundError();
-  }
-
-  const versionEndIndex = data.indexOf(27, versionIndex + BUN_VERSION_MATCH.length);
-
-  if (versionEndIndex <= 0) {
-    throw new VersionNotFoundError();
-  }
-
-  const decoder = new TextDecoder();
-  const versionString = decoder.decode(
-    data.slice(versionIndex + BUN_VERSION_MATCH.length, versionEndIndex),
-  );
-
-  const [, version, revision] = versionString.match(/^(.+) \((.+)\)$/) ?? [];
-
-  if (!version) {
-    throw new VersionNotFoundError();
-  }
-
-  return { version, revision };
+/**
+ * One way a Bun version is embedded in an executable: a literal that precedes
+ * it, how far the version text runs, and how to read a version back out.
+ */
+interface VersionMarker {
+  /** Literal bytes immediately preceding the version text. */
+  marker: string;
+  /** Byte the version text ends at, or null to read a fixed-size window. */
+  terminator: number | null;
+  /** Parse the text after the marker; null when it isn't actually a version. */
+  parse(text: string): BunVersion | null;
+  /** Vestigial, kept for API compatibility — nothing reads it. */
+  newFormat: boolean;
 }
 
-function getExecutableVersionOld(data: Bytes, searchLimit: number): BunVersion {
-  const versionIndex = data.findIndex((_, index) => {
-    if (index >= searchLimit) {
-      return false;
-    }
-
-    for (let i = 0; i < BUN_VERSION_MATCH_OLD.length; i++) {
-      if (data[index + i] !== BUN_VERSION_MATCH_OLD.charCodeAt(i)) {
-        return false;
-      }
-    }
-
-    return true;
-  });
-
-  if (versionIndex === -1) {
-    throw new VersionNotFoundError();
-  }
-
-  const versionEndIndex = data.indexOf(58, versionIndex + BUN_VERSION_MATCH_OLD.length);
-
-  if (versionEndIndex <= 0) {
-    throw new VersionNotFoundError();
-  }
-
-  const decoder = new TextDecoder();
-  const versionString = decoder.decode(
-    data.slice(versionIndex + BUN_VERSION_MATCH_OLD.length, versionEndIndex),
-  );
-
-  const [, version, revision] = versionString.match(/^(.+) \((.+)\)/) ?? [];
-
-  if (!version) {
-    throw new VersionNotFoundError();
-  }
-
-  return { version, revision };
+/** Pull "<version> (<revision>)" out of `text`. */
+function matchVersionRevision(text: string, pattern: RegExp): BunVersion | null {
+  const match = text.match(pattern);
+  return match ? { version: match[1], revision: match[2] } : null;
 }
 
 /**
- * Newest version-string format (Bun 1.4.0+).
- *
- * Bun 1.4.0 stopped embedding a literal version after the ANSI
- * BUN_VERSION_MATCH marker — that became a runtime-substituted placeholder
- * (e.g. `...\x1b[2mv\xc0\x04...`) — but the plain "Bun v<version> (<revision>)"
- * banner is still present in the runtime's read-only data. Scan for it and pull
- * out the semantic version (and revision, if present).
+ * Bun 1.4.0+ banner: "1.4.0", "1.4.0+63bb0ca0d" or "1.1.22-canary.96", each
+ * optionally followed by " (revision)". The revision is the "+<sha>" build
+ * metadata when present, else the parenthetical.
  */
-function getExecutableVersionBanner(data: Bytes, searchLimit: number): BunVersion {
+function parseBanner(text: string): BunVersion | null {
+  const match = text.match(
+    /^(\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)(?:\+([0-9A-Za-z]+))?(?:\s*\(([^)]+)\))?/,
+  );
+  return match ? { version: match[1], revision: match[2] ?? match[3] ?? "" } : null;
+}
+
+/**
+ * Every known embedding, oldest format last. Tried in order; the first that
+ * yields a parseable version wins.
+ */
+const VERSION_MARKERS: VersionMarker[] = [
+  {
+    // Bun 1.2–1.3.x: ANSI-styled "bun build v" then the literal version, which
+    // runs up to the next escape byte.
+    marker: BUN_VERSION_MATCH,
+    terminator: ESC,
+    parse: (text) => matchVersionRevision(text, /^(.+) \((.+)\)$/),
+    newFormat: true,
+  },
+  {
+    // Bun ≤ 1.1.25: "----- bun meta -----\nBun v<version> (<rev>):"
+    marker: BUN_VERSION_MATCH_OLD,
+    terminator: COLON,
+    parse: (text) => matchVersionRevision(text, /^(.+) \((.+)\)/),
+    newFormat: false,
+  },
+  {
+    // Bun 1.4.0+ substitutes the literal above at runtime, so it is never in the
+    // file; the plain "Bun v<version>" banner in the runtime's rodata still is.
+    marker: BUN_VERSION_MATCH_BANNER,
+    terminator: null,
+    parse: parseBanner,
+    newFormat: true,
+  },
+];
+
+/**
+ * Find the first version `marker` in [0, searchLimit) whose text parses.
+ *
+ * A marker can legitimately match something that isn't a version — "Bun v" also
+ * appears in help text, and 1.4.0+ leaves an unsubstituted placeholder after the
+ * ANSI marker — so keep scanning past a hit that fails to parse.
+ */
+function scanForVersion(
+  data: Bytes,
+  searchLimit: number,
+  marker: VersionMarker,
+): BunVersion | null {
   const decoder = new TextDecoder();
-  const needle = BUN_VERSION_MATCH_BANNER;
-
-  // A "Bun v" occurrence may be help text rather than the version banner, so
-  // keep scanning until one actually parses as a version.
   let from = 0;
+
   for (;;) {
-    const index = indexOfBytes(data, needle, from, searchLimit);
-    if (index === -1) break;
+    const index = indexOfBytes(data, marker.marker, from, searchLimit);
+    if (index === -1) {
+      return null;
+    }
 
-    const start = index + needle.length;
-    const window = decoder.decode(data.subarray(start, Math.min(start + 96, data.length)));
+    const start = index + marker.marker.length;
+    const end =
+      marker.terminator === null
+        ? Math.min(start + BANNER_WINDOW, data.length)
+        : data.indexOf(marker.terminator, start);
 
-    // Accepts "1.4.0", "1.4.0+63bb0ca0d", "1.1.22-canary.96", each optionally
-    // followed by " (revision)". Revision is the "+<sha>" build metadata when
-    // present, else the parenthetical (a git sha or a platform string).
-    const match = window.match(
-      /^(\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?)(?:\+([0-9A-Za-z]+))?(?:\s*\(([^)]+)\))?/,
-    );
-    if (match) {
-      return { version: match[1], revision: match[2] ?? match[3] ?? "" };
+    if (end > start) {
+      const version = marker.parse(decoder.decode(data.subarray(start, end)));
+      if (version) {
+        return { ...version, newFormat: marker.newFormat };
+      }
     }
 
     from = start;
   }
-
-  throw new VersionNotFoundError();
 }
 
 /**
@@ -226,21 +217,10 @@ export function getExecutableVersion(data: BinaryInput): BunVersion {
   const sectionOffset = findBunSectionOffset(binary);
   const searchLimit = sectionOffset ?? getModulesStartLegacy(binary);
 
-  // Try each known version-string format in order, newest binaries last. Bun
-  // 1.4.0+ fails the first two matchers (the literal after BUN_VERSION_MATCH is
-  // gone) and falls back to the "Bun v" banner.
-  const matchers: Array<() => BunVersion> = [
-    () => ({ ...getExecutableVersionNew(bytes, searchLimit), newFormat: true }),
-    () => ({ ...getExecutableVersionOld(bytes, searchLimit), newFormat: false }),
-    () => ({ ...getExecutableVersionBanner(bytes, searchLimit), newFormat: true }),
-  ];
-
-  for (const matcher of matchers) {
-    try {
-      return matcher();
-    } catch (e) {
-      if (e instanceof VersionNotFoundError) continue;
-      throw e;
+  for (const marker of VERSION_MARKERS) {
+    const version = scanForVersion(bytes, searchLimit, marker);
+    if (version) {
+      return version;
     }
   }
 

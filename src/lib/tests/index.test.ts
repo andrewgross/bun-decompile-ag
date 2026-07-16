@@ -123,6 +123,30 @@ describe("getExecutableVersion", () => {
     expect(version.version).toBe("1.4.0");
     expect(version.revision).toBe("63bb0ca0d");
   });
+
+  test("with the pre-1.1.26 bun meta format", () => {
+    // Bun <= 1.1.25 wrote "----- bun meta -----\nBun v<version> (<rev>):".
+    // Covered end-to-end by the e2e suite (which compiles real 1.1.x binaries);
+    // pinned here so the marker is exercised without downloading a Bun release.
+    const buf = new Uint8Array(512);
+    buf.set(new TextEncoder().encode("----- bun meta -----\nBun v1.1.0 (5903a614):"), 64);
+
+    const version = getExecutableVersion(buf.buffer);
+    expect(version.version).toBe("1.1.0");
+    expect(version.revision).toBe("5903a614");
+  });
+
+  test("skips a marker hit that isn't a version", () => {
+    // "Bun v" also shows up in help text, and 1.4.0+ leaves an unsubstituted
+    // placeholder after the ANSI marker, so the first hit is not always real.
+    const buf = new Uint8Array(512);
+    const enc = new TextEncoder();
+    buf.set(enc.encode("Bun v<version> is not a version"), 32);
+    buf.set(enc.encode("Bun v1.4.0 (63bb0ca0d)"), 128);
+
+    const version = getExecutableVersion(buf.buffer);
+    expect(version.version).toBe("1.4.0");
+  });
 });
 
 // Wrap a raw Bun payload (the bytes of a __BUN/.bun section) in a minimal
