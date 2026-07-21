@@ -1,5 +1,5 @@
 {
-  "name": "bun-decompile-ag",
+  "name": "@andrewgross/bun-decompile",
   "version": "0.1.0",
   "description": "Extracts the original transpiled sources from an executable file generated via `bun build --compile`. Supports Bun v0.6.0 through v1.4.x on macOS, Linux, and Windows.",
   "author": "Andrew Gross <andrew.w.gross@gmail.com>",
@@ -37,7 +37,6 @@
     "./package.json": "./package.json"
   },
   "bin": {
-    "bun-decompile-ag": "./dist/cli.js",
     "bun-decompile": "./dist/cli.js"
   },
   "files": [

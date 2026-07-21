@@ -10,12 +10,12 @@ import { extractBundledFiles, getExecutableVersion } from "./lib/index.js";
 const pkg = createRequire(import.meta.url)("../package.json");
 
 function printHelp() {
-  console.log(`bun-decompile-ag v${pkg.version}
+  console.log(`bun-decompile v${pkg.version}
 
 Extracts bundled source files from a Bun-compiled binary.
 
 Usage:
-  bun-decompile-ag <input-binary> [options]
+  bun-decompile <input-binary> [options]
 
 Options:
   -o, --output <dir>   Output directory (default: ./decompiled)

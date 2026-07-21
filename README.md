@@ -1,4 +1,4 @@
-# bun-decompile-ag
+# bun-decompile
 
 Extracts the original transpiled sources from an executable produced by
 `bun build --compile`.
@@ -30,47 +30,35 @@ on the version string.
 ## Installation
 
 ```sh
-npm install -g bun-decompile-ag
+npm install -g @andrewgross/bun-decompile
 ```
 
 Or with Bun:
 
 ```sh
-bun add -g bun-decompile-ag
+bun add -g @andrewgross/bun-decompile
 ```
 
 Or run it without installing:
 
 ```sh
-bunx bun-decompile-ag <binary>
-npx bun-decompile-ag <binary>
+bunx @andrewgross/bun-decompile <binary>
+npx @andrewgross/bun-decompile <binary>
 ```
 
 The CLI runs on Node 18+ and on Bun. You do **not** need Bun installed to
 extract a Bun binary.
 
-> **Not on npm yet** — publishing is blocked on the [license](#license). Until
-> then, build from source (installing from the repo with `bun add github:...`
-> silently yields a package with no code — `dist/` comes from a `prepare` script
-> that Bun blocks by default):
->
-> ```sh
-> git clone https://github.com/andrewgross/bun-decompile-ag
-> cd bun-decompile-ag
-> bun install && bun run build
-> node dist/cli.js <binary>       # or: bun src/cli.ts <binary>
-> ```
-
 ## Usage
 
 ```sh
-bun-decompile-ag <input-binary> [options]
+bun-decompile <input-binary> [options]
 ```
 
-Installs also provide a shorter `bun-decompile` alias.
+The installed command is `bun-decompile` (shorter than the scoped package name).
 
 ```console
-$ bun-decompile-ag ./my-app -o ./extracted
+$ bun-decompile ./my-app -o ./extracted
 Bun v1.3.9 (cf6cdbbb)
 Extracted 4 file(s) to ./extracted
 
@@ -99,14 +87,14 @@ writing partial output.
 Extract into a directory of your choosing:
 
 ```sh
-bun-decompile-ag ./my-app -o ./extracted
+bun-decompile ./my-app -o ./extracted
 ```
 
 Keep the entrypoint's original bundled filename instead of renaming it to
 `index.js`:
 
 ```sh
-bun-decompile-ag ./my-app --no-normalize
+bun-decompile ./my-app --no-normalize
 ```
 
 Inline sourcemaps, when present, are written alongside each file as `<file>.map`.
@@ -116,7 +104,7 @@ Inline sourcemaps, when present, are written alongside each file as `<file>.map`
 ```ts
 import { readFile } from "node:fs/promises";
 
-import { extractBundledFiles, getExecutableVersion } from "bun-decompile-ag";
+import { extractBundledFiles, getExecutableVersion } from "@andrewgross/bun-decompile";
 
 const binary = await readFile("./my-app");
 
@@ -218,4 +206,4 @@ license, so its copyright is reserved by default and this derivative work cannot
 grant terms over it. ("UNLICENSED" here is npm's marker for _no license
 granted_ — it is not [The Unlicense](https://unlicense.org).)
 
-If you want to use this, open an issue — resolving this upstream is in progress.
+If you want to use this, open an issue.

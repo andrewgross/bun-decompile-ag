@@ -1,0 +1,64 @@
+name: Release
+
+# Publishes @andrewgross/bun-decompile to npm when a GitHub Release is published.
+#
+# Auth is npm "trusted publishing" (OIDC) — no NPM_TOKEN secret. The trust
+# relationship is configured on npmjs.com against this repo + this workflow file.
+#
+# NOTE: the *first* publish of the package must be done manually from a laptop
+# (`npm publish`). npm cannot create a package via OIDC, only publish new
+# versions to one that already exists.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # required for npm trusted publishing (OIDC)
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # Optional manual-approval gate. Create an environment named "npm-production"
+    # under Settings -> Environments and add required reviewers to make every
+    # release pause for a human click. If the environment has no rules (or you
+    # remove this line), the job just runs — no gate.
+    environment: npm-production
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+
+      - name: Build and typecheck
+        run: |
+          bun run build
+          bun run typecheck
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      # OIDC trusted publishing needs npm >= 11.5.1; setup-node still ships npm 10.
+      - name: Update npm for OIDC support
+        run: npm install -g npm@latest
+
+      - name: Verify the release tag matches package.json version
+        if: github.event_name == 'release'
+        run: |
+          pkg="v$(node -p "require('./package.json').version")"
+          if [ "$pkg" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Release tag $GITHUB_REF_NAME does not match package.json ($pkg). Bump the version and re-tag."
+            exit 1
+          fi
+
+      # publishConfig.access=public + prepare (tsc build) are already in package.json.
+      - name: Publish to npm
+        run: npm publish --provenance --access public
