@@ -19,6 +19,7 @@ mod elf;
 mod error;
 mod macho;
 mod offsets;
+mod pe;
 mod section;
 
 pub use error::{ExtractError, Result};
