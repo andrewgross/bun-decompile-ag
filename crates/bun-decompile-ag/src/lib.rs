@@ -16,6 +16,8 @@
 
 mod bytes;
 mod error;
+mod macho;
 mod offsets;
+mod section;
 
 pub use error::{ExtractError, Result};
