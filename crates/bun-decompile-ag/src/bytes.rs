@@ -80,7 +80,6 @@ pub(crate) fn read_cstring(data: &[u8], offset: usize, max_len: usize) -> String
 /// Find the first occurrence of `needle` whose start index lies in
 /// `[from, limit)`. Only the start is bounded — a match may extend past
 /// `limit` — mirroring the TS `indexOfBytes` used by version scanning.
-#[allow(dead_code)] // Its consumer is version scanning, ported later in the migration.
 pub(crate) fn find_bytes(data: &[u8], needle: &[u8], from: usize, limit: usize) -> Option<usize> {
     if needle.is_empty() {
         return None;

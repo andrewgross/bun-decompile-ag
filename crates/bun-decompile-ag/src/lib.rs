@@ -27,5 +27,6 @@ mod pe;
 mod section;
 #[cfg(test)]
 mod testutil;
+mod version;
 
 pub use error::{ExtractError, Result};
