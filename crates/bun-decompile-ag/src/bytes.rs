@@ -21,17 +21,49 @@ fn read_array<const N: usize>(data: &[u8], offset: usize) -> Result<[u8; N]> {
 
 /// Read a little-endian `u16` at `offset`.
 pub(crate) fn read_u16_le(data: &[u8], offset: usize) -> Result<u16> {
-    Ok(u16::from_le_bytes(read_array(data, offset)?))
+    read_u16_endian(data, offset, true)
 }
 
 /// Read a little-endian `u32` at `offset`.
 pub(crate) fn read_u32_le(data: &[u8], offset: usize) -> Result<u32> {
-    Ok(u32::from_le_bytes(read_array(data, offset)?))
+    read_u32_endian(data, offset, true)
 }
 
 /// Read a little-endian `u64` at `offset`.
 pub(crate) fn read_u64_le(data: &[u8], offset: usize) -> Result<u64> {
-    Ok(u64::from_le_bytes(read_array(data, offset)?))
+    read_u64_endian(data, offset, true)
+}
+
+/// Read a `u16` at `offset` in the given byte order (`little` mirrors the
+/// boolean the TS code passes to `DataView` getters; the ELF parser derives
+/// it from `EI_DATA`).
+pub(crate) fn read_u16_endian(data: &[u8], offset: usize, little: bool) -> Result<u16> {
+    let bytes = read_array(data, offset)?;
+    Ok(if little {
+        u16::from_le_bytes(bytes)
+    } else {
+        u16::from_be_bytes(bytes)
+    })
+}
+
+/// Read a `u32` at `offset` in the given byte order.
+pub(crate) fn read_u32_endian(data: &[u8], offset: usize, little: bool) -> Result<u32> {
+    let bytes = read_array(data, offset)?;
+    Ok(if little {
+        u32::from_le_bytes(bytes)
+    } else {
+        u32::from_be_bytes(bytes)
+    })
+}
+
+/// Read a `u64` at `offset` in the given byte order.
+pub(crate) fn read_u64_endian(data: &[u8], offset: usize, little: bool) -> Result<u64> {
+    let bytes = read_array(data, offset)?;
+    Ok(if little {
+        u64::from_le_bytes(bytes)
+    } else {
+        u64::from_be_bytes(bytes)
+    })
 }
 
 /// Read a NUL-terminated string of at most `max_len` bytes starting at

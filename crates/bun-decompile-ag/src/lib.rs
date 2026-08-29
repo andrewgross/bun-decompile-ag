@@ -15,6 +15,7 @@
 //! components. See `docs/rust-migration.md` for the plan and commit stack.
 
 mod bytes;
+mod elf;
 mod error;
 mod macho;
 mod offsets;
