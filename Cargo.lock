@@ -21,6 +21,10 @@ dependencies = [
 [[package]]
 name = "bun-decompile-ag-cli"
 version = "0.1.0"
+dependencies = [
+ "bun-decompile-ag",
+ "serde_json",
+]
 
 [[package]]
 name = "cfg-if"

@@ -16,5 +16,9 @@ repository.workspace = true
 name = "bun-decompile"
 path = "src/main.rs"
 
+[dependencies]
+bun-decompile-ag = { workspace = true, features = ["serde"] }
+serde_json.workspace = true
+
 [lints]
 workspace = true
