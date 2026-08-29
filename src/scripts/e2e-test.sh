@@ -12,6 +12,11 @@ PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 DUMMY_DIR="$PROJECT_DIR/src/lib/tests/dummy"
 DUMMY_SRC="$DUMMY_DIR/index.ts"
 
+# The CLI under test. Defaults to the TS CLI; override to point at the Rust
+# binary (or any other implementation), e.g.
+#   DECOMPILE_CMD="./target/release/bun-decompile" bun run test:e2e
+DECOMPILE_CMD="${DECOMPILE_CMD:-bun $PROJECT_DIR/src/cli.ts}"
+
 source "$SCRIPT_DIR/get-bun.sh"
 
 # Milestone versions representing each format revision
@@ -41,8 +46,8 @@ for version in "${VERSIONS[@]}"; do
     exit 1
   fi
 
-  # 2. Extract using our CLI (always runs with current Bun)
-  bun "$PROJECT_DIR/src/cli.ts" "$outfile" -o "$outdir"
+  # 2. Extract using the CLI under test
+  $DECOMPILE_CMD "$outfile" -o "$outdir"
 
   # 3. Verify expected files exist
   if [ ! -f "$outdir/index.js" ]; then
@@ -86,7 +91,7 @@ for version in "1.1.26" "1.2.4" "1.3.9" "1.3.14"; do
       exit 1
     fi
 
-    bun "$PROJECT_DIR/src/cli.ts" "$outfile" -o "$outdir" >/dev/null
+    $DECOMPILE_CMD "$outfile" -o "$outdir" >/dev/null
     if [ ! -f "$outdir/index.js" ]; then
       echo "  FAIL: index.js not found for v${version} $tgt"
       exit 1

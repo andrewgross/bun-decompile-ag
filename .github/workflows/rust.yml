@@ -56,3 +56,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: EmbarkStudios/cargo-deny-action@v2
+
+  # Slow: downloads Bun releases and compiles ~60MB binaries. Proves the Rust
+  # CLI matches the TS CLI byte-for-byte (parity) and extracts real binaries
+  # across the version/target matrix (e2e). Linux only, like the TS e2e job.
+  parity-e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Cache downloaded Bun versions
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/bun-decompile
+          key: bun-versions-${{ hashFiles('src/scripts/e2e-test.sh', 'src/scripts/get-bun.sh') }}
+
+      - run: bun install --frozen-lockfile
+      - run: cargo build --release -p bun-decompile-ag-cli
+
+      - name: Parity (TS CLI vs Rust CLI), including the cross-target matrix
+        run: bash src/scripts/parity-test.sh --full
+
+      - name: E2E with the Rust CLI
+        run: DECOMPILE_CMD="$PWD/target/release/bun-decompile" bash src/scripts/e2e-test.sh

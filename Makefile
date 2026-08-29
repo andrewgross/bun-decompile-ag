@@ -3,7 +3,7 @@
 
 CARGO ?= cargo
 
-.PHONY: all fmt fmt-check lint test deny check
+.PHONY: all fmt fmt-check lint test deny check parity e2e
 
 all: check
 
@@ -28,5 +28,17 @@ test:
 
 deny:
 	$(CARGO) deny check
+
+# Migration acceptance gate: diff the TS and Rust CLIs over fixtures, a fresh
+# dummy, and the error cases. Pass --full to add the cross-target matrix
+# (downloads Bun releases). Builds the release binary if needed.
+parity:
+	$(CARGO) build --release -p bun-decompile-ag-cli
+	bash src/scripts/parity-test.sh
+
+# End-to-end against real Bun releases, driving the Rust CLI.
+e2e:
+	$(CARGO) build --release -p bun-decompile-ag-cli
+	DECOMPILE_CMD="$(CURDIR)/target/release/bun-decompile" bash src/scripts/e2e-test.sh
 
 check: fmt-check lint test deny
