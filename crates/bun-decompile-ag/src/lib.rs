@@ -48,6 +48,7 @@ mod elf;
 mod error;
 mod extract;
 mod graph;
+mod inspect;
 mod macho;
 mod offsets;
 mod paths;
@@ -57,9 +58,12 @@ mod section;
 mod testutil;
 mod version;
 
-pub use container::ContainerKind;
+pub use container::{ContainerKind, ExecutableFormat};
 pub use error::{ExtractError, Result};
 pub use extract::{BundledFile, ExtractOptions, SourceMap};
+pub use inspect::{
+    GraphInspection, Inspection, OffsetsInspection, PayloadInspection, inspect_executable,
+};
 pub use paths::remove_leading_slash;
 pub use version::BunVersion;
 

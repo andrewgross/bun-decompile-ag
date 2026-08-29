@@ -11,6 +11,8 @@ use std::process::exit;
 
 use bun_decompile_ag::{ExtractOptions, extract_bundled_files, get_executable_version};
 
+mod debug;
+
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 fn print_help() {
@@ -21,12 +23,16 @@ Extracts bundled source files from a Bun-compiled binary.
 
 Usage:
   bun-decompile <input-binary> [options]
+  bun-decompile debug <input-binary>
 
 Options:
   -o, --output <dir>   Output directory (default: ./decompiled)
   --no-normalize       Don't normalize entrypoint filename to index.js
   -v, --version        Print version and exit
-  -h, --help           Print this help and exit"
+  -h, --help           Print this help and exit
+
+Commands:
+  debug <binary>       Print the binary's container, format, and offsets"
     );
 }
 
@@ -38,6 +44,10 @@ enum Command {
         output_dir: PathBuf,
         no_normalize: bool,
     },
+    /// `debug <binary>`: dump the binary's structure.
+    Debug {
+        input_path: PathBuf,
+    },
     /// Print help and exit with `code` (0 for -h, 1 for a missing input).
     Help {
         code: i32,
@@ -46,6 +56,16 @@ enum Command {
 }
 
 fn parse_args(args: &[String]) -> Result<Command, String> {
+    // `debug` is a subcommand, valid only as the first argument.
+    if args.first().map(String::as_str) == Some("debug") {
+        return match args.get(1) {
+            Some(path) => Ok(Command::Debug {
+                input_path: PathBuf::from(path),
+            }),
+            None => Err("debug requires a binary path".to_owned()),
+        };
+    }
+
     let mut input_path: Option<PathBuf> = None;
     let mut output_dir = PathBuf::from("./decompiled");
     let mut no_normalize = false;
@@ -160,6 +180,13 @@ fn main() {
         Command::Version => {
             println!("{VERSION}");
         }
+        Command::Debug { input_path } => match read_input(&input_path) {
+            Ok(data) => debug::run_debug(&input_path, &data),
+            Err(message) => {
+                eprintln!("Error: {message}");
+                exit(1);
+            }
+        },
         Command::Extract {
             input_path,
             output_dir,
@@ -221,6 +248,29 @@ mod tests {
     #[test]
     fn parse_args_with_version_flag_returns_version() {
         assert_eq!(parse(&["-v"]).unwrap(), Command::Version);
+    }
+
+    #[test]
+    fn parse_args_debug_subcommand_takes_a_binary_path() {
+        assert_eq!(
+            parse(&["debug", "app"]).unwrap(),
+            Command::Debug {
+                input_path: PathBuf::from("app"),
+            },
+        );
+        assert_eq!(
+            parse(&["debug"]).unwrap_err(),
+            "debug requires a binary path"
+        );
+    }
+
+    #[test]
+    fn parse_args_debug_is_only_a_leading_subcommand() {
+        // A file literally named "debug" still extracts when not first.
+        assert!(matches!(
+            parse(&["-o", "out", "debug"]).unwrap(),
+            Command::Extract { .. },
+        ));
     }
 
     #[test]

@@ -30,17 +30,34 @@ pub enum ContainerKind {
     Append,
 }
 
+impl core::fmt::Display for ContainerKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        // Matches the TS ContainerKind union spellings (debug output parity).
+        f.write_str(match self {
+            Self::MachO => "macho",
+            Self::Elf => "elf",
+            Self::Pe => "pe",
+            Self::Append => "append",
+        })
+    }
+}
+
 /// The host executable format identified from magic bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum ExecutableFormat {
+pub enum ExecutableFormat {
+    /// Mach-O 64-bit (macOS).
     MachO,
+    /// ELF (Linux, FreeBSD).
     Elf,
+    /// PE / PE32+ (Windows).
     Pe,
+    /// None of the above.
     Unknown,
 }
 
 impl ExecutableFormat {
-    /// Lowercase name as the TS union used it (error message parity).
+    /// Lowercase name as the TS union used it (error message parity, and the
+    /// `debug` subcommand's output).
     fn name(self) -> &'static str {
         match self {
             Self::MachO => "macho",
@@ -67,6 +84,12 @@ impl ExecutableFormat {
             Self::Pe => Some(ContainerKind::Pe),
             Self::Unknown => None,
         }
+    }
+}
+
+impl core::fmt::Display for ExecutableFormat {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.name())
     }
 }
 
