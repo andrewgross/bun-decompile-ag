@@ -18,8 +18,10 @@ mod bytes;
 mod container;
 mod elf;
 mod error;
+mod graph;
 mod macho;
 mod offsets;
+mod paths;
 mod pe;
 mod section;
 #[cfg(test)]
