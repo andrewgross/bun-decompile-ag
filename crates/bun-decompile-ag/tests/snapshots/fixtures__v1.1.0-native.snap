@@ -1,0 +1,8 @@
+---
+source: crates/bun-decompile-ag/tests/fixtures.rs
+expression: "lines.join(\"\\n\")"
+---
+index.js len=33554 fnv=617d2bac792e6b22 sm{none}
+favicon-550dfe5251fb8704.png len=11253 fnv=a8f9d830f1c7f22d sm{none}
+password2-ff9067db19addcda.bin len=6 fnv=2275e1a01f9632a4 sm{none}
+fakeversion-da3838862959814a.bin len=52 fnv=a5a4af097ddd6b10 sm{none}

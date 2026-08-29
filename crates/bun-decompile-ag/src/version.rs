@@ -10,8 +10,6 @@
 //!
 //! Version detection is informational only: extraction never depends on it.
 
-#![allow(dead_code)] // The public pipeline lands later in the migration.
-
 use crate::bytes::{find_bytes, read_u32_le};
 use crate::container::find_bun_section_offset;
 use crate::error::{ExtractError, Result};

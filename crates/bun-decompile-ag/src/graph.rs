@@ -16,8 +16,6 @@
 //! 4. Otherwise V1/V2 (32/28-byte chunks, walked sequentially), told apart
 //!    by whether the payload size lines up with the metadata pointer.
 
-#![allow(dead_code)] // Consumers land over the next commits of the migration.
-
 use crate::bytes::read_u32_le;
 use crate::container::{BUN_TRAILER, BunSection, ContainerKind};
 use crate::error::{ExtractError, Result};

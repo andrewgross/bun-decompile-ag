@@ -11,8 +11,6 @@
 //! pointers (names, then compressed contents), then the mappings text and
 //! the source names.
 
-#![allow(dead_code)] // The public pipeline lands later in the migration.
-
 use crate::bytes::read_u32_le;
 use crate::error::{ExtractError, Result};
 use crate::graph::ModuleGraph;
@@ -30,17 +28,26 @@ pub struct BundledFile {
 }
 
 /// A standard v3 sourcemap decoded from Bun's internal serialization.
+///
+/// With the `serde` feature, serializes to the same JSON the TS
+/// implementation produced with `JSON.stringify`: declaration field order,
+/// `debugId` camelCased, and omitted entirely when absent.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct SourceMap {
     /// Always 3.
     pub version: u8,
     /// The bundled file this map belongs to (same as `BundledFile::path`).
     pub file: String,
     /// The `//# debugId=` value from the tail of the file, when present.
+    #[cfg_attr(
+        feature = "serde",
+        serde(rename = "debugId", skip_serializing_if = "Option::is_none")
+    )]
     pub debug_id: Option<String>,
     /// VLQ mappings text.
     pub mappings: String,
-    /// Original source texts.
+    /// Original source names.
     pub sources: Vec<String>,
 }
 
@@ -604,5 +611,31 @@ mod tests {
         // and neither must we.
         let short = b"code;\n//# debugId=aaaa-bbbb-cccc"; // 32 bytes
         assert_eq!(find_debug_id(short), None);
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn sourcemap_serializes_like_the_ts_json_stringify() {
+        let sourcemap = SourceMap {
+            version: 3,
+            file: "index.js".to_owned(),
+            debug_id: Some("AD9B1BC5A0F03AAA64756E2164756E21".to_owned()),
+            mappings: "AAAA;BBBB".to_owned(),
+            sources: vec!["src/index.ts".to_owned()],
+        };
+        assert_eq!(
+            serde_json::to_string(&sourcemap).unwrap(),
+            r#"{"version":3,"file":"index.js","debugId":"AD9B1BC5A0F03AAA64756E2164756E21","mappings":"AAAA;BBBB","sources":["src/index.ts"]}"#,
+        );
+
+        // An absent debugId is omitted, like JSON.stringify on undefined.
+        let without = SourceMap {
+            debug_id: None,
+            ..sourcemap
+        };
+        assert_eq!(
+            serde_json::to_string(&without).unwrap(),
+            r#"{"version":3,"file":"index.js","mappings":"AAAA;BBBB","sources":["src/index.ts"]}"#,
+        );
     }
 }

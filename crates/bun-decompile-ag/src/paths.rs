@@ -3,8 +3,6 @@
 //!
 //! Port of the path helpers in `src/lib/modules.ts`.
 
-#![allow(dead_code)] // Consumers land over the next commits of the migration.
-
 use crate::error::{ExtractError, Result};
 
 /// Modern bunfs root (macOS/Linux).
@@ -49,8 +47,9 @@ fn windows_root_len(path: &str) -> Option<usize> {
 }
 
 /// Strip one leading `/` and then one leading `./`, if present. Spec: the TS
-/// regex `^\/?(?:\.\/)?`. Exported by the TS package as a public helper.
-pub(crate) fn remove_leading_slash(path: &str) -> &str {
+/// regex `^\/?(?:\.\/)?`. Public because the TS package exported it as a
+/// helper.
+pub fn remove_leading_slash(path: &str) -> &str {
     let path = path.strip_prefix('/').unwrap_or(path);
     path.strip_prefix("./").unwrap_or(path)
 }

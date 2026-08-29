@@ -7,8 +7,6 @@
 //! Every container is normalized to a byte view that ends exactly at the Bun
 //! trailer, so downstream parsing never cares which container it came from.
 
-#![allow(dead_code)] // Consumers land over the next commits of the migration.
-
 use crate::bytes::read_u32_le;
 use crate::elf::{ELF_MAGIC_LE, find_elf_bun_section};
 use crate::error::{ExtractError, Result};

@@ -19,8 +19,6 @@
 //! pass the 24-byte probe's checks. Only the low u32 of `byte_count` is read,
 //! matching the TS implementation (fine for payloads under 4 GiB).
 
-#![allow(dead_code)] // Consumers land over the next commits of the migration.
-
 use crate::bytes::read_u32_le;
 use crate::error::{ExtractError, Result};
 
