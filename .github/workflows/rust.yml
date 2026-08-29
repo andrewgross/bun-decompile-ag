@@ -37,9 +37,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - uses: taiki-e/install-action@nextest
-      # --no-tests=pass is scaffolding-only: it comes out in the commit that
-      # adds the first tests.
-      - run: cargo nextest run --workspace --all-features --no-tests=pass
+      - run: cargo nextest run --workspace --all-features
       - run: cargo test --workspace --all-features --doc
 
   # The library claims rust-version 1.85 (edition 2024 floor). Prove it.

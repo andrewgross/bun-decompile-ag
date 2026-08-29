@@ -17,11 +17,10 @@ lint:
 	$(CARGO) clippy --workspace --all-targets --all-features -- -D warnings
 
 # Prefers cargo-nextest when installed. Doctests always run via cargo test
-# (nextest does not run them). --no-tests=pass is scaffolding-only: it comes
-# out in the commit that adds the first tests.
+# (nextest does not run them).
 test:
 	@if command -v cargo-nextest >/dev/null 2>&1; then \
-		$(CARGO) nextest run --workspace --all-features --no-tests=pass; \
+		$(CARGO) nextest run --workspace --all-features; \
 	else \
 		$(CARGO) test --workspace --all-features; \
 	fi

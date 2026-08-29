@@ -13,3 +13,8 @@
 //! This crate is being ported component-by-component from the TypeScript
 //! implementation in this repository; the public API lands with the final
 //! components. See `docs/rust-migration.md` for the plan and commit stack.
+
+mod bytes;
+mod error;
+
+pub use error::{ExtractError, Result};
