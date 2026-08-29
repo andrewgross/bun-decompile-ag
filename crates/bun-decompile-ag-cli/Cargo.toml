@@ -1,0 +1,20 @@
+[package]
+name = "bun-decompile-ag-cli"
+description = "CLI to extract the bundled sources from executables built with `bun build --compile`"
+keywords = ["bun", "decompile", "extract", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+# Installed command name matches the npm CLI this replaces; the crate name
+# carries the -ag suffix only to stay out of the original project's namespace.
+[[bin]]
+name = "bun-decompile"
+path = "src/main.rs"
+
+[lints]
+workspace = true

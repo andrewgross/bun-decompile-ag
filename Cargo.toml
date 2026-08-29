@@ -1,0 +1,31 @@
+[workspace]
+resolver = "3"
+members = ["crates/bun-decompile-ag", "crates/bun-decompile-ag-cli"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT"
+authors = ["Andrew Gross <andrew.w.gross@gmail.com>"]
+repository = "https://github.com/andrewgross/bun-decompile-ag"
+
+[workspace.dependencies]
+bun-decompile-ag = { path = "crates/bun-decompile-ag", version = "0.1.0" }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+# The library parses untrusted input and must never panic; fuzzing enforces
+# this at runtime, these lints enforce it at review time. Test code opts out
+# per-module.
+unwrap_used = "warn"
+expect_used = "warn"
+# Pedantic lints that fight this codebase more than they help it.
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"

@@ -1,0 +1,14 @@
+[package]
+name = "bun-decompile-ag"
+description = "Extract the bundled sources from executables built with `bun build --compile`"
+keywords = ["bun", "decompile", "extract", "reverse-engineering"]
+categories = ["parser-implementations", "development-tools"]
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[lints]
+workspace = true

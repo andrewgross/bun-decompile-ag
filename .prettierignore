@@ -9,3 +9,6 @@ yarn.lock
 
 # Build output
 /dist
+
+# Rust
+/target
