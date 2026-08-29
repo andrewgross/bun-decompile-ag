@@ -18,6 +18,7 @@ mod bytes;
 mod container;
 mod elf;
 mod error;
+mod extract;
 mod graph;
 mod macho;
 mod offsets;
