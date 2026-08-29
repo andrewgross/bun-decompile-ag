@@ -82,3 +82,21 @@ jobs:
 
       - name: E2E with the Rust CLI
         run: DECOMPILE_CMD="$PWD/target/release/bun-decompile" bash src/scripts/e2e-test.sh
+
+  # Smoke-fuzz both entry points for the no-panic contract. Not a campaign —
+  # 60s per target, corpus seeded from the committed fixtures.
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "fuzz"
+      - run: cargo install cargo-fuzz --locked
+      - name: Seed corpus from fixtures
+        run: |
+          mkdir -p fuzz/corpus/extract
+          cp src/lib/tests/fixtures/*.bin fuzz/corpus/extract/
+      - run: cargo fuzz run extract fuzz/corpus/extract -- -max_total_time=60
+      - run: cargo fuzz run version fuzz/corpus/extract -- -max_total_time=60

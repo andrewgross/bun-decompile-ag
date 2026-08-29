@@ -1,0 +1,33 @@
+[package]
+name = "bun-decompile-ag-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+bun-decompile-ag = { path = "../crates/bun-decompile-ag" }
+
+[[bin]]
+name = "extract"
+path = "fuzz_targets/extract.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "version"
+path = "fuzz_targets/version.rs"
+test = false
+doc = false
+bench = false
+
+# Fuzz binaries are their own thing; keep them out of the workspace so the
+# nightly-only, sanitizer-instrumented build never touches `cargo build`.
+[workspace]
+
+[profile.release]
+debug = 1

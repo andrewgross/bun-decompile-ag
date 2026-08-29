@@ -12,3 +12,6 @@ yarn.lock
 
 # Rust
 /target
+
+# cargo-fuzz build artifacts
+/fuzz/target
