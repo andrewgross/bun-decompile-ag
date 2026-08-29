@@ -9,8 +9,6 @@
 //! the exact payload length while `SizeOfRawData` is file-aligned and may
 //! include padding past the Bun trailer, so the smaller one wins.
 
-#![allow(dead_code)] // Consumers land over the next commits of the migration.
-
 use crate::bytes::{read_cstring, read_u16_le, read_u32_le};
 use crate::error::Result;
 use crate::section::SectionLocation;
@@ -82,48 +80,55 @@ pub(crate) fn find_pe_bun_section(binary: &[u8]) -> Result<Option<SectionLocatio
     Ok(None)
 }
 
+/// Synthetic-PE layout constants for tests.
+#[cfg(test)]
+pub(crate) const PE_OFFSET: usize = 64;
+#[cfg(test)]
+pub(crate) const SECTION_TABLE: usize = PE_OFFSET + 24; // no optional header
+#[cfg(test)]
+pub(crate) const PAYLOAD_OFFSET: usize = SECTION_TABLE + 40; // one section header
+
+#[cfg(test)]
+pub(crate) fn put_u32(b: &mut [u8], at: usize, v: u32) {
+    b[at..at + 4].copy_from_slice(&v.to_le_bytes());
+}
+
+/// Minimal synthetic PE wrapping `payload` in a `.bun` section — the Rust
+/// port of the TS test suite's `wrapInPe`. `raw_padding` bytes of
+/// file-alignment padding follow the payload and are counted in
+/// `SizeOfRawData` but not `VirtualSize`.
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+pub(crate) fn build_pe(payload: &[u8], raw_padding: usize) -> Vec<u8> {
+    let mut b = vec![0_u8; PAYLOAD_OFFSET + payload.len() + raw_padding];
+
+    b[0] = b'M';
+    b[1] = b'Z';
+    put_u32(&mut b, 0x3C, u32::try_from(PE_OFFSET).unwrap()); // e_lfanew
+    put_u32(&mut b, PE_OFFSET, 0x0000_4550); // "PE\0\0"
+    b[PE_OFFSET + 6] = 1; // NumberOfSections
+    // SizeOfOptionalHeader stays 0.
+
+    b[SECTION_TABLE..SECTION_TABLE + 4].copy_from_slice(b".bun");
+    let virtual_size = u32::try_from(payload.len()).unwrap();
+    let raw_size = u32::try_from(payload.len() + raw_padding).unwrap();
+    put_u32(&mut b, SECTION_TABLE + 8, virtual_size); // VirtualSize
+    put_u32(&mut b, SECTION_TABLE + 16, raw_size); // SizeOfRawData
+    put_u32(
+        &mut b,
+        SECTION_TABLE + 20,
+        u32::try_from(PAYLOAD_OFFSET).unwrap(),
+    );
+
+    b[PAYLOAD_OFFSET..PAYLOAD_OFFSET + payload.len()].copy_from_slice(payload);
+    b
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used)]
 
     use super::*;
-
-    const PE_OFFSET: usize = 64;
-    const SECTION_TABLE: usize = PE_OFFSET + 24; // no optional header
-    const PAYLOAD_OFFSET: usize = SECTION_TABLE + 40; // one section header
-
-    fn put_u32(b: &mut [u8], at: usize, v: u32) {
-        b[at..at + 4].copy_from_slice(&v.to_le_bytes());
-    }
-
-    /// Minimal synthetic PE wrapping `payload` in a `.bun` section — the Rust
-    /// port of the TS test suite's `wrapInPe`. `raw_padding` bytes of
-    /// file-alignment padding follow the payload and are counted in
-    /// `SizeOfRawData` but not `VirtualSize`.
-    fn build_pe(payload: &[u8], raw_padding: usize) -> Vec<u8> {
-        let mut b = vec![0_u8; PAYLOAD_OFFSET + payload.len() + raw_padding];
-
-        b[0] = b'M';
-        b[1] = b'Z';
-        put_u32(&mut b, 0x3C, u32::try_from(PE_OFFSET).unwrap()); // e_lfanew
-        put_u32(&mut b, PE_OFFSET, 0x0000_4550); // "PE\0\0"
-        b[PE_OFFSET + 6] = 1; // NumberOfSections
-        // SizeOfOptionalHeader stays 0.
-
-        b[SECTION_TABLE..SECTION_TABLE + 4].copy_from_slice(b".bun");
-        let virtual_size = u32::try_from(payload.len()).unwrap();
-        let raw_size = u32::try_from(payload.len() + raw_padding).unwrap();
-        put_u32(&mut b, SECTION_TABLE + 8, virtual_size); // VirtualSize
-        put_u32(&mut b, SECTION_TABLE + 16, raw_size); // SizeOfRawData
-        put_u32(
-            &mut b,
-            SECTION_TABLE + 20,
-            u32::try_from(PAYLOAD_OFFSET).unwrap(),
-        );
-
-        b[PAYLOAD_OFFSET..PAYLOAD_OFFSET + payload.len()].copy_from_slice(payload);
-        b
-    }
 
     #[test]
     fn find_pe_bun_section_locates_payload() {

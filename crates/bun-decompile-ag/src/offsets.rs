@@ -204,13 +204,7 @@ mod tests {
     // (scripts in docs/rust-migration.md; fixture layout is
     // [payload ending at trailer][8-byte total count]).
 
-    fn fixture(name: &str) -> Vec<u8> {
-        let path = format!(
-            "{}/../../src/lib/tests/fixtures/{name}.bin",
-            env!("CARGO_MANIFEST_DIR"),
-        );
-        std::fs::read(path).unwrap()
-    }
+    use crate::testutil::fixture;
 
     #[test]
     fn parse_offsets_on_v1_1_26_fixture_matches_ts_values() {

@@ -2,8 +2,6 @@
 //! executable. Port of `src/lib/sections.ts` (whose `readCString` half lives
 //! in `bytes.rs`).
 
-#![allow(dead_code)] // Consumers land over the next commits of the migration.
-
 /// Absolute file offset and exact byte length of the `__BUN`/`.bun` section
 /// inside a host executable. The section data ends exactly at the Bun
 /// trailer; the container dispatcher asserts that when it takes a view.

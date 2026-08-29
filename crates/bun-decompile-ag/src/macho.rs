@@ -7,8 +7,6 @@
 //! +8, `nsects` at +64, and its 80-byte `section_64` headers inline from +72,
 //! each with the name at +0, `size: u64` at +40, and the file offset at +48.
 
-#![allow(dead_code)] // Consumers land over the next commits of the migration.
-
 use crate::bytes::{read_cstring, read_u32_le, read_u64_le};
 use crate::error::Result;
 use crate::section::SectionLocation;
@@ -87,54 +85,55 @@ pub(crate) fn find_macho_bun_section(binary: &[u8]) -> Result<Option<SectionLoca
     Ok(None)
 }
 
+/// Minimal synthetic Mach-O 64 for tests: header, optional filler command,
+/// one segment with one section pointing at `payload` appended after the
+/// headers.
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+pub(crate) fn build_macho(
+    segname: &str,
+    sectname: &str,
+    leading_cmd: Option<(u32, usize)>,
+    payload: &[u8],
+) -> Vec<u8> {
+    const SEGMENT_CMD_LEN: usize = 72;
+    const SECTION_LEN: usize = 80;
+    let (lead_cmd, lead_len) = leading_cmd.unwrap_or((0, 0));
+    let seg_cmdsize = SEGMENT_CMD_LEN + SECTION_LEN;
+    let sizeofcmds = lead_len + seg_cmdsize;
+    let payload_offset = 32 + sizeofcmds;
+    let mut b = vec![0_u8; payload_offset + payload.len()];
+
+    b[0..4].copy_from_slice(&MACHO_MAGIC_64_LE.to_le_bytes());
+    let ncmds: u32 = if lead_len > 0 { 2 } else { 1 };
+    b[16..20].copy_from_slice(&ncmds.to_le_bytes());
+    b[20..24].copy_from_slice(&u32::try_from(sizeofcmds).unwrap().to_le_bytes());
+
+    if lead_len > 0 {
+        b[32..36].copy_from_slice(&lead_cmd.to_le_bytes());
+        b[36..40].copy_from_slice(&u32::try_from(lead_len).unwrap().to_le_bytes());
+    }
+
+    let seg = 32 + lead_len;
+    b[seg..seg + 4].copy_from_slice(&LC_SEGMENT_64.to_le_bytes());
+    b[seg + 4..seg + 8].copy_from_slice(&u32::try_from(seg_cmdsize).unwrap().to_le_bytes());
+    b[seg + 8..seg + 8 + segname.len()].copy_from_slice(segname.as_bytes());
+    b[seg + 64..seg + 68].copy_from_slice(&1_u32.to_le_bytes()); // nsects
+
+    let sect = seg + SEGMENT_CMD_LEN;
+    b[sect..sect + sectname.len()].copy_from_slice(sectname.as_bytes());
+    b[sect + 40..sect + 48].copy_from_slice(&(payload.len() as u64).to_le_bytes());
+    b[sect + 48..sect + 52].copy_from_slice(&u32::try_from(payload_offset).unwrap().to_le_bytes());
+
+    b[payload_offset..].copy_from_slice(payload);
+    b
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used)]
 
     use super::*;
-
-    const SEGMENT_CMD_LEN: usize = 72;
-    const SECTION_LEN: usize = 80;
-
-    /// Minimal Mach-O 64: header, optional filler command, one segment with
-    /// one section pointing at `payload` appended after the headers.
-    fn build_macho(
-        segname: &str,
-        sectname: &str,
-        leading_cmd: Option<(u32, usize)>,
-        payload: &[u8],
-    ) -> Vec<u8> {
-        let (lead_cmd, lead_len) = leading_cmd.unwrap_or((0, 0));
-        let seg_cmdsize = SEGMENT_CMD_LEN + SECTION_LEN;
-        let sizeofcmds = lead_len + seg_cmdsize;
-        let payload_offset = 32 + sizeofcmds;
-        let mut b = vec![0_u8; payload_offset + payload.len()];
-
-        b[0..4].copy_from_slice(&MACHO_MAGIC_64_LE.to_le_bytes());
-        let ncmds: u32 = if lead_len > 0 { 2 } else { 1 };
-        b[16..20].copy_from_slice(&ncmds.to_le_bytes());
-        b[20..24].copy_from_slice(&u32::try_from(sizeofcmds).unwrap().to_le_bytes());
-
-        if lead_len > 0 {
-            b[32..36].copy_from_slice(&lead_cmd.to_le_bytes());
-            b[36..40].copy_from_slice(&u32::try_from(lead_len).unwrap().to_le_bytes());
-        }
-
-        let seg = 32 + lead_len;
-        b[seg..seg + 4].copy_from_slice(&LC_SEGMENT_64.to_le_bytes());
-        b[seg + 4..seg + 8].copy_from_slice(&u32::try_from(seg_cmdsize).unwrap().to_le_bytes());
-        b[seg + 8..seg + 8 + segname.len()].copy_from_slice(segname.as_bytes());
-        b[seg + 64..seg + 68].copy_from_slice(&1_u32.to_le_bytes()); // nsects
-
-        let sect = seg + SEGMENT_CMD_LEN;
-        b[sect..sect + sectname.len()].copy_from_slice(sectname.as_bytes());
-        b[sect + 40..sect + 48].copy_from_slice(&(payload.len() as u64).to_le_bytes());
-        b[sect + 48..sect + 52]
-            .copy_from_slice(&u32::try_from(payload_offset).unwrap().to_le_bytes());
-
-        b[payload_offset..].copy_from_slice(payload);
-        b
-    }
 
     #[test]
     fn find_macho_bun_section_locates_payload() {

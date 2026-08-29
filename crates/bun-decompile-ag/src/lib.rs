@@ -15,11 +15,14 @@
 //! components. See `docs/rust-migration.md` for the plan and commit stack.
 
 mod bytes;
+mod container;
 mod elf;
 mod error;
 mod macho;
 mod offsets;
 mod pe;
 mod section;
+#[cfg(test)]
+mod testutil;
 
 pub use error::{ExtractError, Result};
