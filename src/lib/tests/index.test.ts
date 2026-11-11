@@ -275,6 +275,23 @@ describe("multi-version fixtures", () => {
         const files = extractBundledFiles(data);
         expect(files.length).toBeGreaterThan(0);
         expect(files[0].path).toBe("index.js");
+
+        // The entrypoint is the dummy's code, not some other region of the
+        // payload: Bun 1.4.1 moved the paths into a string table, and reading
+        // contents as "right after the path" returned that table instead.
+        const decoder = new TextDecoder();
+        const entry = decoder.decode(files[0].contents);
+        expect(entry).toContain("Access granted");
+        // The fixtures are built with --sourcemap=inline; its sources name the
+        // dummy (read through the record's sourcemap pointer on V3/V4).
+        // Bun 1.1.0 predates the serialized sourcemap, so check only when present.
+        if (files[0].sourcemap) {
+          expect(files[0].sourcemap.sources[0]).toEndWith("index.ts");
+        }
+        for (const file of files) {
+          expect(decoder.decode(file.contents.slice(0, 13))).not.toStartWith("/$bunfs/");
+          expect(decoder.decode(file.contents.slice(0, 9))).not.toStartWith("B:/~BUN/");
+        }
       });
     }
   }

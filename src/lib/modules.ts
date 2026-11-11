@@ -228,18 +228,30 @@ export function extractModules(graph: ModuleGraph, options: ExtractModulesOption
     }
     path = removeLeadingSlash(path);
 
-    const contentsStart = currentOffset + pathLength + (newFormat ? 1 : 0);
+    // V3/V4 records carry an absolute pointer for every field. Bun <= 1.4.0
+    // happened to lay each module out as path, NUL, contents, NUL, sourcemap,
+    // so the sequential walk also worked there; Bun 1.4.1 moved the paths into
+    // one string table, and only the pointers say where contents and
+    // sourcemaps are. V1/V2 records have no pointers: walk sequentially.
+    const contentsStart = hasAbsoluteOffsets
+      ? view.getUint32(metadataOffset + 8, true)
+      : currentOffset + pathLength + (newFormat ? 1 : 0);
     const contentsEnd = contentsStart + contentsLength;
+    assertInModules(contentsStart, contentsLength, modulesData.byteLength, path, "contents");
     const contents = modulesData.slice(contentsStart, contentsEnd);
 
     let sourcemap: BundledFile["sourcemap"];
     if (sourcemapLength) {
-      const sourcemapMappingsLength = view.getUint32(modulesStart + contentsEnd + 5, true);
+      const sourcemapStart = hasAbsoluteOffsets
+        ? view.getUint32(metadataOffset + 16, true)
+        : contentsEnd + 1;
+      assertInModules(sourcemapStart, sourcemapLength, modulesData.byteLength, path, "sourcemap");
+      const sourcemapMappingsLength = view.getUint32(modulesStart + sourcemapStart + 4, true);
 
       if (sourcemapMappingsLength) {
-        const sourcemapSourcesCount = view.getUint32(modulesStart + contentsEnd + 1, true);
+        const sourcemapSourcesCount = view.getUint32(modulesStart + sourcemapStart, true);
 
-        const mappingsStart = contentsEnd + 9 + sourcemapSourcesCount * 16;
+        const mappingsStart = sourcemapStart + 8 + sourcemapSourcesCount * 16;
         const mappingsEnd = mappingsStart + sourcemapMappingsLength;
 
         const contentsEndData = decoder.decode(contents.slice(contents.byteLength - 49));
@@ -258,7 +270,7 @@ export function extractModules(graph: ModuleGraph, options: ExtractModulesOption
         let sourceStart = mappingsEnd;
         for (let j = 0; j < sourcemapSourcesCount; j++) {
           const sourcemapSourceLength = view.getUint32(
-            modulesStart + contentsEnd + 13 + j * 8,
+            modulesStart + sourcemapStart + 12 + j * 8,
             true,
           );
 
@@ -282,6 +294,21 @@ export function extractModules(graph: ModuleGraph, options: ExtractModulesOption
   }
 
   return bundledFiles;
+}
+
+/** Fail loudly when a record points outside the modules region. */
+function assertInModules(
+  start: number,
+  length: number,
+  modulesLength: number,
+  path: string,
+  field: string,
+): void {
+  if (start + length > modulesLength) {
+    throw new InvalidExecutableError(
+      `The ${field} of ${path} (${start}+${length}) extends past the modules region (${modulesLength})`,
+    );
+  }
 }
 
 export function removeBunfsRootFromPath(path: string): string {
