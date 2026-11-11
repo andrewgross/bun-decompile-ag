@@ -1,9 +1,8 @@
-# Tasks for the Rust workspace. The TS implementation keeps its package.json
-# scripts; these targets drive only the Rust side.
+# Tasks for the Rust workspace.
 
 CARGO ?= cargo
 
-.PHONY: all fmt fmt-check lint test deny check parity e2e
+.PHONY: all fmt fmt-check lint test deny check e2e dummy fixtures
 
 all: check
 
@@ -29,16 +28,20 @@ test:
 deny:
 	$(CARGO) deny check
 
-# Migration acceptance gate: diff the TS and Rust CLIs over fixtures, a fresh
-# dummy, and the error cases. Pass --full to add the cross-target matrix
-# (downloads Bun releases). Builds the release binary if needed.
-parity:
-	$(CARGO) build --release -p bun-decompile-ag-cli
-	bash src/scripts/parity-test.sh
-
-# End-to-end against real Bun releases, driving the Rust CLI.
+# End-to-end against real Bun releases (downloads and caches them under
+# ~/.cache/bun-decompile), driving the release CLI.
 e2e:
 	$(CARGO) build --release -p bun-decompile-ag-cli
-	DECOMPILE_CMD="$(CURDIR)/target/release/bun-decompile" bash src/scripts/e2e-test.sh
+	DECOMPILE_CMD="$(CURDIR)/target/release/bun-decompile" bash scripts/e2e-test.sh
+
+# Compile the test dummy with the Bun on PATH. The real-binary unit tests
+# soft-skip without it.
+dummy:
+	bun build --compile --sourcemap=inline fixtures/dummy/index.ts --outfile fixtures/dummy/dummy
+
+# Regenerate the committed fixtures from the milestone Bun releases.
+fixtures:
+	$(CARGO) build --release -p bun-decompile-ag-cli
+	bash scripts/build-fixtures.sh
 
 check: fmt-check lint test deny

@@ -30,10 +30,7 @@ pub const FIXTURES: [&str; 16] = [
 /// Read a committed fixture: an appended-format blob
 /// `[payload ending at trailer][total byte count: 8 bytes]`.
 pub fn fixture(name: &str) -> Vec<u8> {
-    let path = format!(
-        "{}/../../src/lib/tests/fixtures/{name}.bin",
-        env!("CARGO_MANIFEST_DIR"),
-    );
+    let path = format!("{}/../../fixtures/{name}.bin", env!("CARGO_MANIFEST_DIR"));
     std::fs::read(path).unwrap()
 }
 
@@ -48,10 +45,7 @@ pub fn fixture_payload(name: &str) -> Vec<u8> {
 /// Path of the compiled dummy binary (present only after
 /// `bun build --compile` has run; tests soft-skip without it).
 pub fn dummy_binary() -> Option<Vec<u8>> {
-    let path = concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../src/lib/tests/dummy/dummy"
-    );
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../fixtures/dummy/dummy");
     std::fs::read(path).ok()
 }
 

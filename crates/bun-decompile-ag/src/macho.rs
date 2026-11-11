@@ -191,10 +191,7 @@ mod tests {
     // every platform.
     #[test]
     fn find_macho_bun_section_on_real_dummy_binary_ends_at_trailer() {
-        let path = concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../src/lib/tests/dummy/dummy",
-        );
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../fixtures/dummy/dummy");
         let Ok(binary) = std::fs::read(path) else {
             eprintln!("skipping: dummy binary not built");
             return;

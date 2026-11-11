@@ -25,22 +25,16 @@ pub(crate) const FIXTURES: [&str; 16] = [
 
 /// Read a source file of the dummy program the fixtures were compiled from.
 pub(crate) fn dummy_asset(name: &str) -> Vec<u8> {
-    let path = format!(
-        "{}/../../src/lib/tests/dummy/{name}",
-        env!("CARGO_MANIFEST_DIR"),
-    );
+    let path = format!("{}/../../fixtures/dummy/{name}", env!("CARGO_MANIFEST_DIR"));
     std::fs::read(path).unwrap()
 }
 
-/// Read a committed fixture from `src/lib/tests/fixtures/`. Fixtures are
-/// container-stripped payloads laid out as
+/// Read a committed fixture from `fixtures/`. Fixtures are container-stripped
+/// payloads laid out as
 /// `[modules][metadata][Offsets][trailer][total byte count: 8 bytes]`
-/// (see `src/scripts/extract-section.ts`).
+/// (see `extract_payload`, which `scripts/build-fixtures.sh` uses).
 pub(crate) fn fixture(name: &str) -> Vec<u8> {
-    let path = format!(
-        "{}/../../src/lib/tests/fixtures/{name}.bin",
-        env!("CARGO_MANIFEST_DIR"),
-    );
+    let path = format!("{}/../../fixtures/{name}.bin", env!("CARGO_MANIFEST_DIR"));
     std::fs::read(path).unwrap()
 }
 

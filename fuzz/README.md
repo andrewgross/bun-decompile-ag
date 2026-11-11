@@ -24,7 +24,7 @@ Run one:
 # Seed the corpus from the committed fixtures first (real payloads reach far
 # deeper into the parser than random bytes do).
 mkdir -p corpus/extract
-cp ../src/lib/tests/fixtures/*.bin corpus/extract/
+cp ../fixtures/*.bin corpus/extract/
 
 cargo +nightly fuzz run extract corpus/extract
 cargo +nightly fuzz run version corpus/extract

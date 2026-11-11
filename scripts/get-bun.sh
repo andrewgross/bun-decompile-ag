@@ -3,7 +3,7 @@
 # Source this file and call get_bun_path to get a path to a specific Bun binary.
 #
 # Usage:
-#   source src/scripts/get-bun.sh
+#   source scripts/get-bun.sh
 #   BUN=$(get_bun_path "1.3.9")
 #   "$BUN" --version  # prints 1.3.9
 

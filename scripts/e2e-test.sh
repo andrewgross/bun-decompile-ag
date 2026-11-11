@@ -5,17 +5,23 @@ set -eo pipefail
 # then extract them with our CLI and verify the results.
 #
 # This is slow (downloads Bun versions, compiles ~60MB binaries) and is meant
-# to be run separately from `bun test`.
+# to be run separately from `cargo test` (`make e2e`).
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-DUMMY_DIR="$PROJECT_DIR/src/lib/tests/dummy"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+DUMMY_DIR="$PROJECT_DIR/fixtures/dummy"
 DUMMY_SRC="$DUMMY_DIR/index.ts"
 
-# The CLI under test. Defaults to the TS CLI; override to point at the Rust
-# binary (or any other implementation), e.g.
-#   DECOMPILE_CMD="./target/release/bun-decompile" bun run test:e2e
-DECOMPILE_CMD="${DECOMPILE_CMD:-bun $PROJECT_DIR/src/cli.ts}"
+# The CLI under test: the release build by default (built on demand).
+# Override to test another build, e.g.
+#   DECOMPILE_CMD="./target/debug/bun-decompile" bash scripts/e2e-test.sh
+if [ -z "${DECOMPILE_CMD:-}" ]; then
+  DECOMPILE_CMD="$PROJECT_DIR/target/release/bun-decompile"
+  if [ ! -x "$DECOMPILE_CMD" ]; then
+    echo "Building the Rust CLI (set DECOMPILE_CMD to skip)..."
+    (cd "$PROJECT_DIR" && cargo build --release -p bun-decompile-ag-cli)
+  fi
+fi
 
 source "$SCRIPT_DIR/get-bun.sh"
 

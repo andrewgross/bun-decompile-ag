@@ -1,7 +1,8 @@
+# Loaders for compiling the test dummy (fixtures/dummy/index.ts) with
+# `bun build --compile`, which reads this file from the working directory:
+# the scripts and make targets run from the repo root. password1.txt loads
+# as text (a string); the .bin and .png assets load as embedded files.
 [loader]
 ".txt" = "text"
 ".bin" = "file"
 ".png" = "file"
-
-[test]
-coverage = true

@@ -371,10 +371,7 @@ mod tests {
     // the dummy is not built.
     #[test]
     fn get_executable_version_on_real_dummy_binary_is_not_fooled() {
-        let path = concat!(
-            env!("CARGO_MANIFEST_DIR"),
-            "/../../src/lib/tests/dummy/dummy"
-        );
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../fixtures/dummy/dummy");
         let Ok(binary) = std::fs::read(path) else {
             eprintln!("skipping: dummy binary not built");
             return;

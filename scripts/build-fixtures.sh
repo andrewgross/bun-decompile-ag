@@ -4,8 +4,8 @@ set -eo pipefail
 # Build test fixtures for milestone Bun versions and compile targets.
 #
 # Each fixture is a small extracted payload (~few KB) that IS checked into git,
-# so `bun test` covers every metadata format (V1-V4) and both bunfs path roots
-# on any OS, with no Bun downloads and no platform-specific setup.
+# so `cargo test` covers every metadata format (V1-V4) and both bunfs path
+# roots on any OS, with no Bun downloads and no platform-specific setup.
 #
 # Targets are cross-compiled, so a single host produces Linux and Windows
 # fixtures too — no Windows machine required. Bun < 1.1.26 predates `--target`
@@ -17,9 +17,9 @@ set -eo pipefail
 # e2e suite, which builds real binaries.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-FIXTURES_DIR="${FIXTURES_DIR:-$PROJECT_DIR/src/lib/tests/fixtures}"
-DUMMY_DIR="$PROJECT_DIR/src/lib/tests/dummy"
+PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+FIXTURES_DIR="${FIXTURES_DIR:-$PROJECT_DIR/fixtures}"
+DUMMY_DIR="$PROJECT_DIR/fixtures/dummy"
 DUMMY_SRC="$DUMMY_DIR/index.ts"
 
 source "$SCRIPT_DIR/get-bun.sh"

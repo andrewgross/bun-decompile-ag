@@ -429,6 +429,8 @@ mod tests {
         );
         assert!(files[0].contents.starts_with(b"// @bun\n"));
 
+        // The dummy's path when the fixtures were built (it now lives in
+        // fixtures/dummy/).
         let sourcemap = files[0].sourcemap.as_ref().unwrap();
         assert_eq!(sourcemap.sources, ["src/lib/tests/dummy/index.ts"]);
         assert_eq!(
@@ -529,7 +531,8 @@ mod tests {
             Some("AD9B1BC5A0F03AAA64756E2164756E21"),
         );
         // v3 sourcemap `sources` entries are names, not content; this is the
-        // dummy program's path, pinned from the TS oracle.
+        // dummy program's path when the fixtures were built (it now lives in
+        // fixtures/dummy/), pinned from the TS oracle.
         assert_eq!(sourcemap.sources[0], "src/lib/tests/dummy/index.ts");
     }
 

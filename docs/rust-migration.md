@@ -1,5 +1,13 @@
 # Rust migration plan
 
+> **Status: complete (2026-11-11).** Commits 1–15 landed as planned, with Bun
+> 1.4.1's pointer-based module reads folded into the port before the TS was
+> retired. `extract-section` became `bun-decompile debug --payload` (commit
+> 16), and commit 17 retired the TypeScript implementation, which lives on at
+> the `ts-final` tag along with the parity harness. Its last full run there was
+> byte-identical across all sixteen fixtures and the cross-target matrix
+> through Bun 1.4.1. The rest of this document is the plan as written.
+
 Port bun-decompile from TypeScript to Rust: a library crate embeddable by other
 Rust projects, plus a thin CLI. Feature parity with the current extractor —
 every Bun layout from v0.6.0 through 1.4.x (V1–V4 metadata, Mach-O/ELF/PE

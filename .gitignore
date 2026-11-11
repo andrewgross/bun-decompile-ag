@@ -1,10 +1,6 @@
-# Test executables
-/src/lib/tests/dummy/dummy
-/src/lib/tests/dummy/dummy-v*
-/src/lib/tests/selfcheck/selfcheck
-/src/lib/tests/selfcheck/selfcheck-v*
-
-node_modules
+# The compiled test dummy (`make dummy`), and the stray outputs older Bun
+# versions write next to its source
+/fixtures/dummy/dummy*
 
 # OS
 .DS_Store
@@ -15,7 +11,8 @@ node_modules
 !.env.example
 !.env.test
 
-# Build output
+# Leftovers from the TypeScript implementation (tag ts-final)
+node_modules
 /dist
 
 # Rust

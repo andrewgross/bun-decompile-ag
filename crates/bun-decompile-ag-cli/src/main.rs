@@ -1,9 +1,10 @@
-//! CLI for `bun-decompile-ag`. Port of `src/cli.ts`.
+//! CLI for `bun-decompile-ag`. Port of the TypeScript `src/cli.ts` (tag
+//! `ts-final`).
 //!
 //! Argument parsing is hand-rolled rather than clap so that help text,
-//! error messages, and exit codes stay byte-identical to the TS CLI — the
-//! parity harness diffs them. The surface is four flags plus the `debug`
-//! subcommand; revisit if it grows.
+//! error messages, and exit codes stayed byte-identical to the TS CLI, which
+//! the migration's parity harness diffed. The surface is four flags plus the
+//! `debug` subcommand; revisit if it grows.
 
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
