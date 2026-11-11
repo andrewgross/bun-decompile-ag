@@ -1,0 +1,19 @@
+# cargo-deny configuration: supply-chain gates for the Rust workspace.
+
+[graph]
+all-features = true
+
+[advisories]
+yanked = "deny"
+
+[licenses]
+# Unicode-3.0 comes in through unicode-ident (thiserror's proc-macro stack).
+allow = ["MIT", "Apache-2.0", "Unicode-3.0"]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

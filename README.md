@@ -5,7 +5,10 @@ Extracts the original transpiled sources from an executable produced by
 
 This is a maintained fork of [lafkpages/bun-decompile](https://github.com/lafkpages/bun-decompile),
 which did the original reverse-engineering of Bun's standalone module graph. See
-[Credits](#credits).
+[Credits](#credits). It is written in Rust: a library crate, `bun-decompile-ag`,
+and the `bun-decompile` command-line tool. The TypeScript implementation it
+replaced is preserved at the [`ts-final`](https://github.com/andrewgross/bun-decompile-ag/tree/ts-final)
+tag.
 
 ## What it supports
 
@@ -26,37 +29,27 @@ Four on-disk metadata formats are handled (V1 through V4), spanning the
 1.4.0 is supported, including its
 [reworked version banner](#a-note-on-bun-140) — extraction itself never depends
 on the version string — and so is Bun 1.4.1's
-[separate path table](#a-note-on-bun-141).
+[separate path table](#a-note-on-bun-141). Sourcemaps from 1.4.0+ binaries have
+a [known limitation](#known-limitation-sourcemaps-from-bun-140).
 
 ## Installation
 
 ```sh
-npm install -g @andrewgross/bun-decompile
+cargo install --locked --git https://github.com/andrewgross/bun-decompile-ag bun-decompile-ag-cli
 ```
 
-Or with Bun:
+This installs the `bun-decompile` command. It needs Rust 1.85 or newer to
+build. You do **not** need Bun installed to extract a Bun binary.
 
-```sh
-bun add -g @andrewgross/bun-decompile
-```
-
-Or run it without installing:
-
-```sh
-bunx @andrewgross/bun-decompile <binary>
-npx @andrewgross/bun-decompile <binary>
-```
-
-The CLI runs on Node 18+ and on Bun. You do **not** need Bun installed to
-extract a Bun binary.
+The TypeScript release on npm, `@andrewgross/bun-decompile`, no longer receives
+updates. Its last version, 0.1.1, predates the Bun 1.4.1 fix.
 
 ## Usage
 
 ```sh
 bun-decompile <input-binary> [options]
+bun-decompile debug <input-binary> [--payload <file>]
 ```
-
-The installed command is `bun-decompile` (shorter than the scoped package name).
 
 ```console
 $ bun-decompile ./my-app -o ./extracted
@@ -100,41 +93,58 @@ bun-decompile ./my-app --no-normalize
 
 Inline sourcemaps, when present, are written alongside each file as `<file>.map`.
 
+### Inspecting a binary
+
+```sh
+bun-decompile debug ./my-app
+```
+
+Prints what each stage of the extractor found: the executable format, the
+section offset, the Bun version, the `Offsets` struct (with a hexdump), and the
+resolved module graph. Each stage reports its own failure, so a binary from a
+future Bun release that breaks one stage still shows everything up to it.
+`--payload <file>` also writes the container-stripped payload, the format of the
+test fixtures.
+
 ## Library usage
 
-```ts
-import { readFile } from "node:fs/promises";
+```toml
+[dependencies]
+bun-decompile-ag = { git = "https://github.com/andrewgross/bun-decompile-ag" }
+```
 
-import { extractBundledFiles, getExecutableVersion } from "@andrewgross/bun-decompile";
+```rust
+use bun_decompile_ag::{ExtractOptions, extract_bundled_files, get_executable_version};
 
-const binary = await readFile("./my-app");
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let data = std::fs::read("./my-app")?;
 
-const { version, revision } = getExecutableVersion(binary);
-const files = extractBundledFiles(binary);
+    if let Ok(version) = get_executable_version(&data) {
+        println!("Bun v{} ({})", version.version, version.revision);
+    }
 
-for (const file of files) {
-  console.log(file.path, file.contents.byteLength);
+    for file in extract_bundled_files(&data, ExtractOptions::default())? {
+        println!("{} ({} bytes)", file.path, file.contents.len());
+    }
+    Ok(())
 }
 ```
 
-Both entry points accept a `Buffer`, `Uint8Array`, `ArrayBuffer`, or `DataView`
-(`BinaryInput`). Views are read using their own `byteOffset`/`byteLength`, so a
-pooled or sliced `Buffer` works correctly.
-
-The library itself is runtime-agnostic — it touches no Node or Bun APIs and
-operates purely on `DataView`, so it runs unchanged in the browser.
-
 ### API
 
-| Export                 | Description                                                        |
-| ---------------------- | ------------------------------------------------------------------ |
-| `extractBundledFiles`  | Returns `BundledFile[]` — `{ path, contents, sourcemap? }`         |
-| `getExecutableVersion` | Returns `{ version, revision }` read from the embedded Bun runtime |
-| `removeLeadingSlash`   | Path helper                                                        |
+| Item                     | Description                                                              |
+| ------------------------ | ------------------------------------------------------------------------ |
+| `extract_bundled_files`  | `Vec<BundledFile>` (`path`, `contents`, `sourcemap`), entry point first |
+| `get_executable_version` | `BunVersion` (`version`, `revision`) read from the embedded Bun runtime  |
+| `inspect_executable`     | Stage-by-stage structural report (what `bun-decompile debug` prints)     |
+| `extract_payload`        | The container-stripped payload, as a self-contained appended blob        |
+| `remove_leading_slash`   | Path helper                                                              |
 
-Structural problems raise a subclass of `InvalidExecutableError`
-(`InvalidTrailerError`, `TotalByteCountMismatchError`, `VersionNotFoundError`)
-rather than returning partial or corrupt data.
+Malformed input never panics: every structural problem is an `ExtractError`
+rather than partial or corrupt data, and the entry points are fuzzed to hold
+that. The `serde` feature makes `SourceMap` serializable as a standard v3
+sourcemap JSON object. The library has no dependencies beyond `thiserror` (and
+`serde` behind that feature).
 
 ### A note on Bun 1.4.0
 
@@ -143,7 +153,7 @@ Bun 1.4.0 stopped embedding a literal version string after its ANSI
 breaks naive version detection. This fork falls back to scanning the runtime's
 `Bun v<version>` banner.
 
-Version detection is informational only. `extractBundledFiles` is driven
+Version detection is informational only. `extract_bundled_files` is driven
 entirely by the binary's struct layout, so a future Bun release that changes the
 banner again will still extract; the CLI degrades to a warning rather than
 failing.
@@ -156,48 +166,62 @@ contents, NUL, sourcemap, so reading the contents "right after the path"
 worked; on 1.4.1 that read returns a slice of the path table, with the right
 length and no error. V3/V4 records carry an absolute `{offset, length}`
 pointer for every field (path, contents, sourcemap, bytecode, module info,
-bytecode origin path), so contents and sourcemaps are now read through those
+bytecode origin path), so contents and sourcemaps are read through those
 pointers, and a pointer outside the modules region fails loudly. V1/V2 records
 have no pointers and are still walked sequentially. On 1.4.0 and earlier the
 pointer read returns byte-identical output.
 
+### Known limitation: sourcemaps from Bun 1.4.0+
+
+Through 1.3.x, Bun stores a module's sourcemap mappings as VLQ text, which is
+what a `.map` file's `mappings` field holds. Bun 1.4.0 switched to a binary
+encoding that the extractor does not decode yet, so the `.map` files written for
+1.4.0+ binaries carry those raw bytes in `mappings` and are not usable by
+sourcemap tools. Their `sources` and `debugId` are correct, and the extracted
+files themselves are unaffected.
+
 ## Development
 
-```sh
-bun install
-```
+`make check` runs everything CI does: `cargo fmt --check`, clippy with
+warnings denied, the test suite, doctests, and `cargo deny`.
 
-| Script                   | Description                                   |
-| ------------------------ | --------------------------------------------- |
-| `bun run build`          | Compile to `dist/` (JS + type declarations)   |
-| `bun test`               | Unit tests                                    |
-| `bun run test:e2e`       | End-to-end tests against real Bun releases    |
-| `bun run typecheck`      | Typecheck without emitting                    |
-| `bun run lint`           | Prettier check                                |
-| `bun run build-fixtures` | Regenerate unit-test fixtures                 |
-| `bun run debug-binary`   | Inspect a binary's container, format, offsets |
+| Command          | Description                                                     |
+| ---------------- | --------------------------------------------------------------- |
+| `make test`      | Unit and integration tests (nextest when installed), doctests   |
+| `make lint`      | Clippy, warnings denied                                         |
+| `make fmt`       | Format the workspace                                            |
+| `make e2e`       | End-to-end tests against real Bun releases                      |
+| `make dummy`     | Compile the test dummy with the Bun on `PATH`                   |
+| `make fixtures`  | Regenerate the committed fixtures from the milestone Bun releases |
 
-### Unit tests
+### Tests
 
-Build the dummy test binary first, then run the suite:
-
-```sh
-bun build --compile --sourcemap=inline src/lib/tests/dummy/index.ts --outfile src/lib/tests/dummy/dummy
-DUMMY_VERSION=$(bun --version) bun test
-```
+The fixtures in `fixtures/` are container-stripped payloads, one per metadata
+format revision and target (plus the 1.4.0 and 1.4.1 layouts), compiled from
+the dummy program in `fixtures/dummy/`. They are committed, so `cargo test`
+covers every format on any OS with no Bun install; snapshot tests pin each
+module's path, length, and content fingerprint. A few tests also run against a
+real compiled dummy and skip quietly without one; build it with `make dummy`
+(needs Bun on `PATH`).
 
 ### E2E tests
 
-Compiles a dummy binary with Bun v1.1.0, v1.1.26, v1.2.4, v1.3.9, v1.4.0 and
-v1.4.1 — one per metadata format revision, plus the 1.4.x layout changes — and extracts each with the CLI. Then uses v1.3.14 to
-cross-compile `bun-linux-x64` and `bun-windows-x64` targets, exercising ELF and
-PE section extraction.
+Compiles the dummy with Bun v1.1.0, v1.1.26, v1.2.4, v1.3.9, v1.4.0 and v1.4.1
+(one per metadata format revision, plus the 1.4.x layout changes) and extracts
+each with the CLI. Then cross-compiles `bun-darwin-arm64`, `bun-linux-x64`, and
+`bun-windows-x64` targets with v1.1.26, v1.2.4, v1.3.9 and v1.3.14, exercising
+every container a given version and target produce.
 
 ```sh
-bun run test:e2e
+make e2e
 ```
 
 Downloaded Bun versions are cached under `~/.cache/bun-decompile/`.
+
+### Fuzzing
+
+Both entry points have `cargo-fuzz` targets enforcing the no-panic contract; see
+[`fuzz/README.md`](fuzz/README.md). CI runs a short smoke pass of each.
 
 ## Credits
 
@@ -213,16 +237,18 @@ This fork adds:
 - Bun 1.4.0 version-banner detection, and non-fatal version detection
 - Bun 1.4.1's separate path table (contents and sourcemaps read through the
   record pointers)
-- A refactor into a container-detection pipeline, plus a Node-compatible CLI
+- A container-detection pipeline, rewritten in Rust as an embeddable library
+  and CLI, fuzzed so that no input can make it panic
 
 ## License
 
-Currently **UNLICENSED** — no redistribution rights are granted. This is a
-derivative of [lafkpages/bun-decompile](https://github.com/lafkpages/bun-decompile),
-which publishes no license, so upstream's copyright is reserved by default and
-this fork cannot grant terms over it. ("UNLICENSED" is npm's marker for _no
-license granted_ — it is not [The Unlicense](https://unlicense.org).)
+[MIT](LICENSE).
 
-This is waiting on a licensing decision from upstream; if it becomes possible,
-this project would be released under the [MIT License](https://opensource.org/license/mit).
-Until then, if you'd like to use it, open an issue.
+The Rust implementation is new code written against the binary format as Bun's
+own MIT-licensed source defines it (`src/standalone_graph/StandaloneModuleGraph.zig`),
+with the earlier TypeScript implementation used as a behavioral test oracle.
+That TypeScript implementation, a derivative of
+[lafkpages/bun-decompile](https://github.com/lafkpages/bun-decompile), which
+publishes no license, was never licensed: it remains **UNLICENSED** in this
+repository's history up to the `ts-final` tag and in the npm releases of
+`@andrewgross/bun-decompile`.

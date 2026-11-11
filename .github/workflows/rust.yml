@@ -1,0 +1,103 @@
+name: Rust
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all --check
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: taiki-e/install-action@nextest
+      # A real compiled binary for the soft-skip tests (they skip without one,
+      # or when it is another platform's container). Latest Bun, so a format
+      # change in a new release shows up here first. Windows output gets an
+      # .exe suffix; drop it so the tests find the PE build too.
+      - uses: oven-sh/setup-bun@v2
+      - name: Build the test dummy
+        shell: bash
+        run: |
+          bun build --compile --sourcemap=inline fixtures/dummy/index.ts --outfile fixtures/dummy/dummy
+          if [ -f fixtures/dummy/dummy.exe ]; then mv fixtures/dummy/dummy.exe fixtures/dummy/dummy; fi
+      - run: cargo nextest run --workspace --all-features
+      - run: cargo test --workspace --all-features --doc
+
+  # The library claims rust-version 1.85 (edition 2024 floor). Prove it.
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.85"
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo check --workspace --all-features --all-targets
+
+  deny:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+
+  # Slow: downloads Bun releases and compiles ~60MB binaries, then extracts
+  # each across the version/target matrix. Linux only.
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Cache downloaded Bun versions
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/bun-decompile
+          key: bun-versions-${{ hashFiles('scripts/e2e-test.sh', 'scripts/get-bun.sh') }}
+
+      - run: make e2e
+
+  # Smoke-fuzz both entry points for the no-panic contract. Not a campaign —
+  # 60s per target, corpus seeded from the committed fixtures.
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "fuzz"
+      - run: cargo install cargo-fuzz --locked
+      - name: Seed corpus from fixtures
+        run: |
+          mkdir -p fuzz/corpus/extract
+          cp fixtures/*.bin fuzz/corpus/extract/
+      - run: cargo fuzz run extract fuzz/corpus/extract -- -max_total_time=60
+      - run: cargo fuzz run version fuzz/corpus/extract -- -max_total_time=60
