@@ -11,10 +11,6 @@
 !.env.example
 !.env.test
 
-# Leftovers from the TypeScript implementation (tag ts-final)
-node_modules
-/dist
-
 # Rust
 /target
 
