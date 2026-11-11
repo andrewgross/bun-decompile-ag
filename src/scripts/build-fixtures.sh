@@ -27,7 +27,10 @@ source "$SCRIPT_DIR/get-bun.sh"
 # Milestone versions, one per metadata format revision:
 #   1.1.0  → V1 (32-byte chunks)      1.2.4  → V3 (36-byte chunks)
 #   1.1.26 → V2 (28-byte chunks)      1.3.9  → V4 (52-byte chunks)
-VERSIONS=("1.1.0" "1.1.26" "1.2.4" "1.3.9")
+#   1.4.0  → V4, banner-only version  1.4.1  → V4, paths in a separate string
+#                                              table (contents only reachable
+#                                              through the record's pointer)
+VERSIONS=("1.1.0" "1.1.26" "1.2.4" "1.3.9" "1.4.0" "1.4.1")
 
 # Cross-compile targets. windows-x64 matters beyond the container: its bundled
 # paths use the `B:/~BUN/root` bunfs root rather than `/$bunfs/root`.

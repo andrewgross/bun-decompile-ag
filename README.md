@@ -25,7 +25,8 @@ Four on-disk metadata formats are handled (V1 through V4), spanning the
 0.6.0-era layout through the 32-byte offset struct introduced in 1.3.0. Bun
 1.4.0 is supported, including its
 [reworked version banner](#a-note-on-bun-140) — extraction itself never depends
-on the version string.
+on the version string — and so is Bun 1.4.1's
+[separate path table](#a-note-on-bun-141).
 
 ## Installation
 
@@ -147,6 +148,19 @@ entirely by the binary's struct layout, so a future Bun release that changes the
 banner again will still extract; the CLI degrades to a warning rather than
 failing.
 
+### A note on Bun 1.4.1
+
+Bun 1.4.1 moved every module's path into one string table near the end of the
+payload. Up to 1.4.0 each module happened to be laid out as path, NUL,
+contents, NUL, sourcemap, so reading the contents "right after the path"
+worked; on 1.4.1 that read returns a slice of the path table, with the right
+length and no error. V3/V4 records carry an absolute `{offset, length}`
+pointer for every field (path, contents, sourcemap, bytecode, module info,
+bytecode origin path), so contents and sourcemaps are now read through those
+pointers, and a pointer outside the modules region fails loudly. V1/V2 records
+have no pointers and are still walked sequentially. On 1.4.0 and earlier the
+pointer read returns byte-identical output.
+
 ## Development
 
 ```sh
@@ -174,8 +188,8 @@ DUMMY_VERSION=$(bun --version) bun test
 
 ### E2E tests
 
-Compiles a dummy binary with Bun v1.1.0, v1.1.26, v1.2.4, and v1.3.9 — one per
-metadata format revision — and extracts each with the CLI. Then uses v1.3.14 to
+Compiles a dummy binary with Bun v1.1.0, v1.1.26, v1.2.4, v1.3.9, v1.4.0 and
+v1.4.1 — one per metadata format revision, plus the 1.4.x layout changes — and extracts each with the CLI. Then uses v1.3.14 to
 cross-compile `bun-linux-x64` and `bun-windows-x64` targets, exercising ELF and
 PE section extraction.
 
@@ -197,6 +211,8 @@ This fork adds:
 - Linux (ELF) and Windows (PE) `.bun` section support
 - V3 and V4 metadata formats (Bun 1.2.4+ and 1.3.0+)
 - Bun 1.4.0 version-banner detection, and non-fatal version detection
+- Bun 1.4.1's separate path table (contents and sourcemaps read through the
+  record pointers)
 - A refactor into a container-detection pipeline, plus a Node-compatible CLI
 
 ## License
