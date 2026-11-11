@@ -27,10 +27,39 @@ pub const FIXTURES: [&str; 16] = [
     "v1.4.1-windows-x64",
 ];
 
+/// The sourcemap fixtures (built from `fixtures/sourcemap/`), each with the
+/// map Bun 1.4.1 wrote for the same target, which decoding must reproduce.
+/// Bun 1.4.0 writes no map of its own but bundles the program identically.
+pub const SOURCEMAP_FIXTURES: [(&str, &str); 6] = [
+    (
+        "sourcemap-v1.4.0-darwin-arm64",
+        "sourcemap-v1.4.1-darwin-arm64",
+    ),
+    ("sourcemap-v1.4.0-linux-x64", "sourcemap-v1.4.1-linux-x64"),
+    (
+        "sourcemap-v1.4.0-windows-x64",
+        "sourcemap-v1.4.1-windows-x64",
+    ),
+    (
+        "sourcemap-v1.4.1-darwin-arm64",
+        "sourcemap-v1.4.1-darwin-arm64",
+    ),
+    ("sourcemap-v1.4.1-linux-x64", "sourcemap-v1.4.1-linux-x64"),
+    (
+        "sourcemap-v1.4.1-windows-x64",
+        "sourcemap-v1.4.1-windows-x64",
+    ),
+];
+
 /// Read a committed fixture: an appended-format blob
 /// `[payload ending at trailer][total byte count: 8 bytes]`.
 pub fn fixture(name: &str) -> Vec<u8> {
-    let path = format!("{}/../../fixtures/{name}.bin", env!("CARGO_MANIFEST_DIR"));
+    fixture_file(&format!("{name}.bin"))
+}
+
+/// Read any committed file under `fixtures/` by its full name.
+pub fn fixture_file(name: &str) -> Vec<u8> {
+    let path = format!("{}/../../fixtures/{name}", env!("CARGO_MANIFEST_DIR"));
     std::fs::read(path).unwrap()
 }
 

@@ -51,6 +51,62 @@ fn extract_bundled_files_snapshots_every_fixture() {
 }
 
 #[test]
+fn extract_bundled_files_on_sourcemap_fixtures_reproduces_the_bundlers_map() {
+    for (name, map_name) in common::SOURCEMAP_FIXTURES {
+        let files =
+            extract_bundled_files(&common::fixture(name), ExtractOptions::default()).unwrap();
+        let expected: serde_json::Value =
+            serde_json::from_slice(&common::fixture_file(&format!("{map_name}.map"))).unwrap();
+
+        assert_eq!(files[0].path, "index.js", "{name}");
+        let sourcemap = files[0].sourcemap.as_ref().unwrap();
+        // The binary form records nothing after the last mapping, so the
+        // bundler's trailing `;` separators do not survive it (Bun's own
+        // re-encoding drops them too).
+        let mappings = expected["mappings"].as_str().unwrap();
+        assert_eq!(sourcemap.mappings, mappings.trim_end_matches(';'), "{name}");
+        let sources: Vec<&str> = expected["sources"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|source| source.as_str().unwrap())
+            .collect();
+        assert_eq!(sourcemap.sources, sources, "{name}");
+        if name == map_name {
+            // Same build as the map, so the same debug id.
+            assert_eq!(
+                sourcemap.debug_id.as_deref(),
+                expected["debugId"].as_str(),
+                "{name}"
+            );
+        }
+    }
+}
+
+#[test]
+fn extract_bundled_files_on_every_fixture_yields_vlq_mappings() {
+    // Mappings are base64 VLQ text whatever form Bun stored them in. Before
+    // the binary form was decoded, Bun 1.4.x maps carried its raw bytes.
+    let names = common::FIXTURES
+        .into_iter()
+        .chain(common::SOURCEMAP_FIXTURES.into_iter().map(|(name, _)| name));
+    for name in names {
+        let files =
+            extract_bundled_files(&common::fixture(name), ExtractOptions::default()).unwrap();
+        for file in &files {
+            let Some(sourcemap) = &file.sourcemap else {
+                continue;
+            };
+            let bad = sourcemap
+                .mappings
+                .bytes()
+                .find(|b| !(b.is_ascii_alphanumeric() || matches!(b, b'+' | b'/' | b',' | b';')));
+            assert_eq!(bad, None, "{name}: {} has non-VLQ mappings", file.path);
+        }
+    }
+}
+
+#[test]
 fn extract_payload_on_every_fixture_returns_it_unchanged() {
     // A fixture is already a stripped payload in the appended layout, so
     // stripping it again is the identity.

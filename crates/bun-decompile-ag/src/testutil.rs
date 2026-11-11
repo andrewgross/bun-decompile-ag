@@ -46,3 +46,26 @@ pub(crate) fn fixture_payload(name: &str) -> Vec<u8> {
     data.truncate(data.len() - 8);
     data
 }
+
+/// The mapping bytes of the entrypoint's sourcemap in a V4 fixture, and the
+/// entrypoint's contents length. Fixtures hold the modules region at offset
+/// 0, the entrypoint is module 0, and its record's sourcemap pointer sits at
+/// +16/+20.
+pub(crate) fn entry_mappings(name: &str) -> (Vec<u8>, usize) {
+    let data = fixture(name);
+    let u32_at = |at: usize| u32::from_le_bytes(data[at..at + 4].try_into().unwrap()) as usize;
+    let offsets = data.len() - 8 - 16 - 32;
+    let record = u32_at(offsets + 8);
+    let contents_len = u32_at(record + 12);
+    let sourcemap = u32_at(record + 16);
+    let sources = u32_at(sourcemap);
+    let len = u32_at(sourcemap + 4);
+    let start = sourcemap + 8 + 16 * sources;
+    (data[start..start + len].to_vec(), contents_len)
+}
+
+/// Read any committed file under `fixtures/` by its full name.
+pub(crate) fn fixture_file(name: &str) -> Vec<u8> {
+    let path = format!("{}/../../fixtures/{name}", env!("CARGO_MANIFEST_DIR"));
+    std::fs::read(path).unwrap()
+}

@@ -8,12 +8,14 @@
 //! `{offset, length}` pointers; V1/V2 records carry none, so their modules
 //! are walked sequentially. A serialized sourcemap opens with its sources
 //! count and mappings length (u32 each), then two tables of per-source
-//! pointers (names, then compressed contents), then the mappings text and
-//! the source names.
+//! pointers (names, then compressed contents), then the mappings and the
+//! source names. The mappings are VLQ text through Bun 1.3.x and a binary
+//! index from 1.4.0, which [`crate::mappings`] decodes back to VLQ.
 
 use crate::bytes::read_u32_le;
 use crate::error::{ExtractError, Result};
 use crate::graph::ModuleGraph;
+use crate::mappings;
 use crate::paths::{remove_bunfs_root_from_path, remove_leading_slash};
 
 /// A file recovered from the executable.
@@ -45,7 +47,8 @@ pub struct SourceMap {
         serde(rename = "debugId", skip_serializing_if = "Option::is_none")
     )]
     pub debug_id: Option<String>,
-    /// VLQ mappings text.
+    /// VLQ mappings text. For Bun 1.4.0+ binaries, decoded from Bun's binary
+    /// form; lines after the last mapping carry no `;` separators.
     pub mappings: String,
     /// Original source names.
     pub sources: Vec<String>,
@@ -163,8 +166,19 @@ fn decode_sourcemap(
             })?,
     )?;
     let mappings_start = checked_add(start, table)?;
-    let mappings =
-        String::from_utf8_lossy(slice(region, mappings_start, mappings_length)?).into_owned();
+    let raw = slice(region, mappings_start, mappings_length)?;
+    // VLQ text through Bun 1.3.x; Bun 1.4.0+ stores a binary index of the
+    // same mappings. No mapping can sit past the module's last line, and a
+    // line needs at least one byte, so the contents length bounds them.
+    let mappings = if mappings::is_vlq_text(raw) {
+        String::from_utf8_lossy(raw).into_owned()
+    } else {
+        mappings::decode_binary(raw, contents.len()).map_err(|reason| {
+            ExtractError::InvalidExecutable(format!(
+                "The sourcemap of {path} has malformed mappings: {reason}"
+            ))
+        })?
+    };
 
     let mut sources = Vec::with_capacity(sources_count.min(1024));
     let mut source_start = checked_add(mappings_start, mappings_length)?;
