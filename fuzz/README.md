@@ -14,7 +14,8 @@ cargo install cargo-fuzz
 
 Targets:
 
-- `extract` — `extract_bundled_files` under both option settings.
+- `extract` — `extract_bundled_files` under both option settings, and
+  `extract_payload`.
 - `version` — `get_executable_version` and `inspect_executable`.
 
 Run one:

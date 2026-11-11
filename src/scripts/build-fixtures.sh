@@ -11,18 +11,25 @@ set -eo pipefail
 # fixtures too — no Windows machine required. Bun < 1.1.26 predates `--target`
 # and is built natively instead.
 #
-# Note the fixtures are container-stripped (see extract-section.ts), so they
-# exercise format resolution and module walking, not section finding. Container
-# parsing is covered by the synthetic ELF/PE/Mach-O tests and by the e2e suite,
-# which builds real binaries.
+# Note the fixtures are container-stripped (`bun-decompile debug --payload`),
+# so they exercise format resolution and module walking, not section finding.
+# Container parsing is covered by the synthetic ELF/PE/Mach-O tests and by the
+# e2e suite, which builds real binaries.
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
-FIXTURES_DIR="$PROJECT_DIR/src/lib/tests/fixtures"
+FIXTURES_DIR="${FIXTURES_DIR:-$PROJECT_DIR/src/lib/tests/fixtures}"
 DUMMY_DIR="$PROJECT_DIR/src/lib/tests/dummy"
 DUMMY_SRC="$DUMMY_DIR/index.ts"
 
 source "$SCRIPT_DIR/get-bun.sh"
+
+# The Rust CLI strips each compiled binary down to its payload.
+RUST_CLI="${RUST_CLI:-$PROJECT_DIR/target/release/bun-decompile}"
+if [ ! -x "$RUST_CLI" ]; then
+  echo "Building the Rust CLI (set RUST_CLI to skip)..."
+  (cd "$PROJECT_DIR" && cargo build --release -p bun-decompile-ag-cli)
+fi
 
 # Milestone versions, one per metadata format revision:
 #   1.1.0  → V1 (32-byte chunks)      1.2.4  → V3 (36-byte chunks)
@@ -63,8 +70,8 @@ build_fixture() {
     return 0
   fi
 
-  bun "$SCRIPT_DIR/extract-section.ts" "$outfile" \
-    -o "$FIXTURES_DIR/v${version}-${label}.bin" >/dev/null
+  "$RUST_CLI" debug "$outfile" \
+    --payload "$FIXTURES_DIR/v${version}-${label}.bin" >/dev/null
   echo "  ok   ${label} -> v${version}-${label}.bin"
   rm -f "$outfile"
 }

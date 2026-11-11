@@ -6,7 +6,9 @@
 
 mod common;
 
-use bun_decompile_ag::{ExtractOptions, extract_bundled_files, get_executable_version};
+use bun_decompile_ag::{
+    ExtractOptions, extract_bundled_files, extract_payload, get_executable_version,
+};
 
 fn assert_dummy_bundle(binary: &[u8], what: &str) {
     let files = extract_bundled_files(binary, ExtractOptions::default()).unwrap();
@@ -41,6 +43,39 @@ fn extracts_through_a_synthetic_pe_bun_section() {
 }
 
 #[test]
+fn extract_payload_through_each_synthetic_container_returns_the_fixture() {
+    type Wrap = fn(&[u8]) -> Vec<u8>;
+    let wrappers: [(&str, Wrap); 3] = [
+        ("v1.4.1-darwin-arm64", common::wrap_in_macho),
+        ("v1.4.1-linux-x64", common::wrap_in_elf),
+        ("v1.4.1-windows-x64", common::wrap_in_pe),
+    ];
+    for (name, wrap) in wrappers {
+        let binary = wrap(&common::fixture_payload(name));
+        assert_eq!(
+            extract_payload(&binary).unwrap(),
+            common::fixture(name),
+            "{name}",
+        );
+    }
+}
+
+#[test]
+fn extract_payload_strips_a_section_header_before_the_modules() {
+    // Real V4 sections open with an 8-byte size header ahead of the modules
+    // region; the stripped payload starts at the modules, not the section.
+    let payload = common::fixture_payload("v1.4.1-darwin-arm64");
+    let mut section = (payload.len() as u64).to_le_bytes().to_vec();
+    section.extend_from_slice(&payload);
+
+    let binary = common::wrap_in_macho(&section);
+    assert_eq!(
+        extract_payload(&binary).unwrap(),
+        common::fixture("v1.4.1-darwin-arm64"),
+    );
+}
+
+#[test]
 fn a_v2_payload_in_a_named_section_errors_like_the_ts() {
     // The container-to-format shortcut only goes one way: named sections
     // exist since Bun 1.2.4, so the resolver assumes V3 for them. A V2
@@ -65,6 +100,13 @@ fn extracts_the_real_dummy_binary_when_present() {
         return;
     };
     assert_dummy_bundle(&binary, "dummy");
+
+    // The stripped payload extracts to exactly the same files.
+    let blob = extract_payload(&binary).unwrap();
+    assert_eq!(
+        extract_bundled_files(&blob, ExtractOptions::default()).unwrap(),
+        extract_bundled_files(&binary, ExtractOptions::default()).unwrap(),
+    );
 
     let version = get_executable_version(&binary).unwrap();
     assert_ne!(version.version, "fakeversion1");

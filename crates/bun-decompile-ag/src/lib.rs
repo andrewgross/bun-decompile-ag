@@ -94,6 +94,39 @@ pub fn extract_bundled_files(data: &[u8], options: ExtractOptions) -> Result<Vec
     extract_modules(&graph, options)
 }
 
+/// Copy out the Bun payload as a self-contained blob in the legacy appended
+/// layout, `[modules][metadata][Offsets][trailer][total length: u64 LE]`,
+/// with the host executable and any section header stripped.
+///
+/// [`extract_bundled_files`] reads the blob back to the same files, which
+/// makes it a compact test fixture: the committed fixtures are built this
+/// way. Even a V3 payload taken out of a section round-trips, because Bun
+/// 1.2.x appended that same layout for its Linux and Windows targets.
+///
+/// # Errors
+///
+/// The same structural errors as [`extract_bundled_files`]: the payload is
+/// cut only once its module graph validates.
+pub fn extract_payload(data: &[u8]) -> Result<Vec<u8>> {
+    let section = locate_bun_section(data)?;
+    let trailer_offset = section.data.len().saturating_sub(BUN_TRAILER.len());
+    let offsets = parse_offsets(section.data, trailer_offset)?;
+    let graph = build_module_graph(&section, offsets)?;
+
+    let payload = section
+        .data
+        .get(graph.modules_start..)
+        .ok_or(ExtractError::Truncated {
+            offset: graph.modules_start,
+            len: 0,
+        })?;
+    let total = payload.len() + 8;
+    let mut blob = Vec::with_capacity(total);
+    blob.extend_from_slice(payload);
+    blob.extend_from_slice(&(total as u64).to_le_bytes());
+    Ok(blob)
+}
+
 /// Read the Bun version this executable was compiled with.
 ///
 /// Informational only: [`extract_bundled_files`] never depends on it, and

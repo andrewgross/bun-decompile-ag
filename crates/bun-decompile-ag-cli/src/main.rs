@@ -2,8 +2,8 @@
 //!
 //! Argument parsing is hand-rolled rather than clap so that help text,
 //! error messages, and exit codes stay byte-identical to the TS CLI — the
-//! parity harness diffs them. The surface is four flags; revisit if it
-//! grows.
+//! parity harness diffs them. The surface is four flags plus the `debug`
+//! subcommand; revisit if it grows.
 
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
@@ -23,7 +23,7 @@ Extracts bundled source files from a Bun-compiled binary.
 
 Usage:
   bun-decompile <input-binary> [options]
-  bun-decompile debug <input-binary>
+  bun-decompile debug <input-binary> [--payload <file>]
 
 Options:
   -o, --output <dir>   Output directory (default: ./decompiled)
@@ -32,7 +32,9 @@ Options:
   -h, --help           Print this help and exit
 
 Commands:
-  debug <binary>       Print the binary's container, format, and offsets"
+  debug <binary>       Print the binary's container, format, and offsets
+    --payload <file>   Also write the container-stripped payload (the
+                       format of the committed test fixtures)"
     );
 }
 
@@ -44,9 +46,11 @@ enum Command {
         output_dir: PathBuf,
         no_normalize: bool,
     },
-    /// `debug <binary>`: dump the binary's structure.
+    /// `debug <binary> [--payload <file>]`: dump the binary's structure,
+    /// and optionally write its container-stripped payload.
     Debug {
         input_path: PathBuf,
+        payload_path: Option<PathBuf>,
     },
     /// Print help and exit with `code` (0 for -h, 1 for a missing input).
     Help {
@@ -58,12 +62,7 @@ enum Command {
 fn parse_args(args: &[String]) -> Result<Command, String> {
     // `debug` is a subcommand, valid only as the first argument.
     if args.first().map(String::as_str) == Some("debug") {
-        return match args.get(1) {
-            Some(path) => Ok(Command::Debug {
-                input_path: PathBuf::from(path),
-            }),
-            None => Err("debug requires a binary path".to_owned()),
-        };
+        return parse_debug_args(&args[1..]);
     }
 
     let mut input_path: Option<PathBuf> = None;
@@ -99,6 +98,38 @@ fn parse_args(args: &[String]) -> Result<Command, String> {
             no_normalize,
         }),
         None => Ok(Command::Help { code: 1 }),
+    }
+}
+
+fn parse_debug_args(args: &[String]) -> Result<Command, String> {
+    let mut input_path: Option<PathBuf> = None;
+    let mut payload_path: Option<PathBuf> = None;
+
+    let mut iter = args.iter();
+    while let Some(arg) = iter.next() {
+        match arg.as_str() {
+            "--payload" => match iter.next() {
+                Some(next) => payload_path = Some(PathBuf::from(next)),
+                None => return Err("--payload requires a file path".to_owned()),
+            },
+            other if other.starts_with('-') => {
+                return Err(format!("Unknown option: {other}"));
+            }
+            other => {
+                if input_path.is_some() {
+                    return Err("Multiple input files specified".to_owned());
+                }
+                input_path = Some(PathBuf::from(other));
+            }
+        }
+    }
+
+    match input_path {
+        Some(input_path) => Ok(Command::Debug {
+            input_path,
+            payload_path,
+        }),
+        None => Err("debug requires a binary path".to_owned()),
     }
 }
 
@@ -180,13 +211,22 @@ fn main() {
         Command::Version => {
             println!("{VERSION}");
         }
-        Command::Debug { input_path } => match read_input(&input_path) {
-            Ok(data) => debug::run_debug(&input_path, &data),
-            Err(message) => {
+        Command::Debug {
+            input_path,
+            payload_path,
+        } => {
+            let result = read_input(&input_path).and_then(|data| {
+                debug::run_debug(&input_path, &data);
+                match payload_path {
+                    Some(payload_path) => debug::write_payload(&data, &payload_path),
+                    None => Ok(()),
+                }
+            });
+            if let Err(message) = result {
                 eprintln!("Error: {message}");
                 exit(1);
             }
-        },
+        }
         Command::Extract {
             input_path,
             output_dir,
@@ -256,11 +296,48 @@ mod tests {
             parse(&["debug", "app"]).unwrap(),
             Command::Debug {
                 input_path: PathBuf::from("app"),
+                payload_path: None,
             },
         );
         assert_eq!(
             parse(&["debug"]).unwrap_err(),
             "debug requires a binary path"
+        );
+    }
+
+    #[test]
+    fn parse_args_debug_with_payload_returns_the_output_path() {
+        let expected = Command::Debug {
+            input_path: PathBuf::from("app"),
+            payload_path: Some(PathBuf::from("out.bin")),
+        };
+        assert_eq!(
+            parse(&["debug", "app", "--payload", "out.bin"]).unwrap(),
+            expected
+        );
+        assert_eq!(
+            parse(&["debug", "--payload", "out.bin", "app"]).unwrap(),
+            expected
+        );
+    }
+
+    #[test]
+    fn parse_args_debug_with_bad_arguments_errors() {
+        assert_eq!(
+            parse(&["debug", "app", "--payload"]).unwrap_err(),
+            "--payload requires a file path",
+        );
+        assert_eq!(
+            parse(&["debug", "--payload", "out.bin"]).unwrap_err(),
+            "debug requires a binary path",
+        );
+        assert_eq!(
+            parse(&["debug", "a", "b"]).unwrap_err(),
+            "Multiple input files specified",
+        );
+        assert_eq!(
+            parse(&["debug", "app", "-o", "x"]).unwrap_err(),
+            "Unknown option: -o",
         );
     }
 

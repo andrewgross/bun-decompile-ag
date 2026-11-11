@@ -1,10 +1,11 @@
 //! The `bun-decompile debug <binary>` subcommand: a formatter over the
 //! library's [`bun_decompile_ag::inspect_executable`]. Port of
-//! `src/scripts/debug-binary.ts`, output kept line-compatible.
+//! `src/scripts/debug-binary.ts`, output kept line-compatible; `--payload`
+//! is the port of `src/scripts/extract-section.ts`.
 
 use std::path::Path;
 
-use bun_decompile_ag::inspect_executable;
+use bun_decompile_ag::{extract_payload, inspect_executable};
 
 pub fn run_debug(input_path: &Path, data: &[u8]) {
     let inspection = inspect_executable(data);
@@ -79,4 +80,14 @@ pub fn run_debug(input_path: &Path, data: &[u8]) {
         }
         Err(err) => println!("FAILED: {err}"),
     }
+}
+
+/// `--payload`: write the container-stripped payload, the layout of the
+/// committed test fixtures (`build-fixtures.sh` makes them this way).
+pub fn write_payload(data: &[u8], out_path: &Path) -> Result<(), String> {
+    let blob = extract_payload(data).map_err(|err| err.to_string())?;
+    std::fs::write(out_path, &blob).map_err(|err| err.to_string())?;
+    println!("\n=== Payload ===");
+    println!("Wrote {} bytes to {}", blob.len(), out_path.display());
+    Ok(())
 }

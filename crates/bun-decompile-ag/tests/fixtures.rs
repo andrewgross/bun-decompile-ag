@@ -8,7 +8,7 @@
 mod common;
 
 use bun_decompile_ag::{
-    ExtractError, ExtractOptions, extract_bundled_files, get_executable_version,
+    ExtractError, ExtractOptions, extract_bundled_files, extract_payload, get_executable_version,
 };
 
 /// FNV-1a (64-bit): a dependency-free content fingerprint for snapshots.
@@ -48,6 +48,22 @@ fn extract_bundled_files_snapshots_every_fixture() {
 
         insta::assert_snapshot!(name, lines.join("\n"));
     }
+}
+
+#[test]
+fn extract_payload_on_every_fixture_returns_it_unchanged() {
+    // A fixture is already a stripped payload in the appended layout, so
+    // stripping it again is the identity.
+    for name in common::FIXTURES {
+        let data = common::fixture(name);
+        assert_eq!(extract_payload(&data).unwrap(), data, "{name}");
+    }
+}
+
+#[test]
+fn extract_payload_on_a_non_executable_errors_with_invalid_trailer() {
+    let err = extract_payload(&[0_u8; 64]).unwrap_err();
+    assert!(matches!(err, ExtractError::InvalidTrailer(_)), "{err:?}");
 }
 
 #[test]
