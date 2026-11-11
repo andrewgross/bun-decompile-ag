@@ -1,0 +1,4 @@
+# Test inputs are compared byte for byte. The dummy's assets are text-like
+# only by accident, so never convert their line endings on checkout (with
+# core.autocrlf, as on Windows, password2.bin's LF would become CRLF).
+fixtures/** -text
