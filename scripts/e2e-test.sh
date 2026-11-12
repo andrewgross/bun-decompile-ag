@@ -64,7 +64,15 @@ for version in "${VERSIONS[@]}"; do
   file_count=$(ls "$outdir/" | wc -l | tr -d ' ')
   echo "  Extracted ${file_count} files"
 
-  # 4. Cleanup
+  # 4. Sourcemaps hold VLQ text, whatever form Bun stored them in (1.4.0+
+  #    stores a binary index that must be decoded).
+  if [ -f "$outdir/index.js.map" ] &&
+    ! grep -Eq '"mappings":"[A-Za-z0-9+/,;]*"' "$outdir/index.js.map"; then
+    echo "  FAIL: index.js.map mappings are not VLQ text"
+    exit 1
+  fi
+
+  # 5. Cleanup
   rm -rf "$outfile" "$outdir"
 
   echo ""

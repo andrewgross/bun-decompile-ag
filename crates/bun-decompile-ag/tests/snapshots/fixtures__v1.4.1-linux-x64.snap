@@ -2,7 +2,7 @@
 source: crates/bun-decompile-ag/tests/fixtures.rs
 expression: "lines.join(\"\\n\")"
 ---
-index.js len=2356 fnv=3ec48d4c4c096cde sm{mappings:205,sources:1,debugId:46AEE77ECCECCE7B64756E2164756E21}
+index.js len=2356 fnv=3ec48d4c4c096cde sm{mappings:360,sources:1,debugId:46AEE77ECCECCE7B64756E2164756E21}
 favicon-47vhjydn.png len=11253 fnv=a8f9d830f1c7f22d sm{none}
 password1-ntkv8amb.txt len=5 fnv=c2f2e59f8dc05af0 sm{none}
 password2-twdsv7gz.bin len=6 fnv=2275e1a01f9632a4 sm{none}

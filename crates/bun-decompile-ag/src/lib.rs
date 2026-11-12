@@ -50,6 +50,7 @@ mod extract;
 mod graph;
 mod inspect;
 mod macho;
+mod mappings;
 mod offsets;
 mod paths;
 mod pe;

@@ -15,12 +15,25 @@ set -eo pipefail
 # so they exercise format resolution and module walking, not section finding.
 # Container parsing is covered by the synthetic ELF/PE/Mach-O tests and by the
 # e2e suite, which builds real binaries.
+#
+# Two sets:
+#   dummy      v<version>-<target>.bin from fixtures/dummy/, one per metadata
+#              format revision
+#   sourcemap  sourcemap-v<version>-<target>.bin (and .map) from
+#              fixtures/sourcemap/, for Bun 1.4's binary sourcemap mappings
+#
+# Usage: scripts/build-fixtures.sh [dummy|sourcemap|all]   (default: all)
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 FIXTURES_DIR="${FIXTURES_DIR:-$PROJECT_DIR/fixtures}"
 DUMMY_DIR="$PROJECT_DIR/fixtures/dummy"
 DUMMY_SRC="$DUMMY_DIR/index.ts"
+SETS="${1:-all}"
+case "$SETS" in
+  dummy|sourcemap|all) ;;
+  *) echo "Usage: $0 [dummy|sourcemap|all]" >&2; exit 1 ;;
+esac
 
 source "$SCRIPT_DIR/get-bun.sh"
 
@@ -76,21 +89,71 @@ build_fixture() {
   rm -f "$outfile"
 }
 
-for version in "${VERSIONS[@]}"; do
-  echo "=== Bun v${version} ==="
+if [ "$SETS" != "sourcemap" ]; then
+  for version in "${VERSIONS[@]}"; do
+    echo "=== Bun v${version} ==="
 
-  # Bun 1.1.0 has no --compile --target support; build for the host instead.
-  if [ "$version" = "1.1.0" ]; then
-    build_fixture "$version" "" "native"
+    # Bun 1.1.0 has no --compile --target support; build for the host instead.
+    if [ "$version" = "1.1.0" ]; then
+      build_fixture "$version" "" "native"
+      echo ""
+      continue
+    fi
+
+    for target in "${TARGETS[@]}"; do
+      build_fixture "$version" "$target" "${target#bun-}"
+    done
     echo ""
-    continue
+  done
+fi
+
+# Sourcemap fixtures: a multi-module program whose sourcemap exercises every
+# part of Bun 1.4's binary mappings encoding (several windows, source switches,
+# multi-line gaps, multi-byte varints). Built with --sourcemap=external, for
+# which Bun 1.4.1 also writes the bundler's own map next to the binary: that
+# .map is what decoding the embedded binary mappings must reproduce. Bun 1.4.0
+# writes no .map but bundles this program identically, so its fixtures are
+# checked against the 1.4.1 maps. Built from the repo root so the map's source
+# paths are stable.
+SOURCEMAP_VERSIONS=("1.4.0" "1.4.1")
+
+build_sourcemap_fixture() {
+  local version="$1" target="$2" label="${2#bun-}"
+  local outfile="/tmp/sourcemap-fixture-${version}-${label}"
+  local name="sourcemap-v${version}-${label}"
+  local bun_bin
+  bun_bin=$(get_bun_path "$version")
+  rm -f "$outfile" "${outfile}.exe" "${outfile}.map"
+
+  (cd "$PROJECT_DIR" && "$bun_bin" build --compile --sourcemap=external \
+    --target="$target" fixtures/sourcemap/index.ts --outfile "$outfile" >/dev/null 2>&1) || true
+
+  local binary="$outfile"
+  [ -f "${outfile}.exe" ] && binary="${outfile}.exe"
+  if [ ! -s "$binary" ]; then
+    echo "  SKIP ${label}: compile failed"
+    return 0
   fi
 
-  for target in "${TARGETS[@]}"; do
-    build_fixture "$version" "$target" "${target#bun-}"
+  "$RUST_CLI" debug "$binary" --payload "$FIXTURES_DIR/${name}.bin" >/dev/null
+  if [ -f "${outfile}.map" ]; then
+    cp "${outfile}.map" "$FIXTURES_DIR/${name}.map"
+    echo "  ok   ${label} -> ${name}.bin, ${name}.map"
+  else
+    echo "  ok   ${label} -> ${name}.bin"
+  fi
+  rm -f "$binary" "${outfile}.map"
+}
+
+if [ "$SETS" != "dummy" ]; then
+  for version in "${SOURCEMAP_VERSIONS[@]}"; do
+    echo "=== Bun v${version} (sourcemap) ==="
+    for target in "${TARGETS[@]}"; do
+      build_sourcemap_fixture "$version" "$target"
+    done
+    echo ""
   done
-  echo ""
-done
+fi
 
 echo "Fixtures in $FIXTURES_DIR:"
 ls -la "$FIXTURES_DIR"

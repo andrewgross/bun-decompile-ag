@@ -29,8 +29,8 @@ Four on-disk metadata formats are handled (V1 through V4), spanning the
 1.4.0 is supported, including its
 [reworked version banner](#a-note-on-bun-140) — extraction itself never depends
 on the version string — and so is Bun 1.4.1's
-[separate path table](#a-note-on-bun-141). Sourcemaps from 1.4.0+ binaries have
-a [known limitation](#known-limitation-sourcemaps-from-bun-140).
+[separate path table](#a-note-on-bun-141), as are 1.4.0+'s
+[binary sourcemaps](#a-note-on-bun-14-sourcemaps).
 
 ## Installation
 
@@ -171,14 +171,14 @@ pointers, and a pointer outside the modules region fails loudly. V1/V2 records
 have no pointers and are still walked sequentially. On 1.4.0 and earlier the
 pointer read returns byte-identical output.
 
-### Known limitation: sourcemaps from Bun 1.4.0+
+### A note on Bun 1.4 sourcemaps
 
-Through 1.3.x, Bun stores a module's sourcemap mappings as VLQ text, which is
-what a `.map` file's `mappings` field holds. Bun 1.4.0 switched to a binary
-encoding that the extractor does not decode yet, so the `.map` files written for
-1.4.0+ binaries carry those raw bytes in `mappings` and are not usable by
-sourcemap tools. Their `sources` and `debugId` are correct, and the extracted
-files themselves are unaffected.
+Through 1.3.x, Bun stores a module's sourcemap mappings as the VLQ text a `.map`
+file's `mappings` field holds. From 1.4.0 it stores a compact binary index of
+the same mappings instead, which the extractor decodes and re-encodes as VLQ.
+That reproduces the bundler's own mappings exactly, except for trailing `;`
+separators: the index records nothing after the last mapping, which changes no
+position. A binary index that does not parse is an error, not a garbage `.map`.
 
 ## Development
 
@@ -198,9 +198,12 @@ warnings denied, the test suite, doctests, and `cargo deny`.
 
 The fixtures in `fixtures/` are container-stripped payloads, one per metadata
 format revision and target (plus the 1.4.0 and 1.4.1 layouts), compiled from
-the dummy program in `fixtures/dummy/`. They are committed, so `cargo test`
-covers every format on any OS with no Bun install; snapshot tests pin each
-module's path, length, and content fingerprint. A few tests also run against a
+the dummy program in `fixtures/dummy/`. The `sourcemap-*` fixtures come from the
+multi-module program in `fixtures/sourcemap/`, built so its sourcemap exercises
+every part of Bun 1.4's binary encoding; each is checked against the `.map` Bun
+1.4.1 wrote for the same build. They are committed, so `cargo test` covers every
+format on any OS with no Bun install; snapshot tests pin each module's path,
+length, and content fingerprint. A few tests also run against a
 real compiled dummy and skip quietly without one; build it with `make dummy`
 (needs Bun on `PATH`).
 
